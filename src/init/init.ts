@@ -3,8 +3,8 @@ import { loadConfig } from "../config/load.js";
 import type { SafConfigV1 } from "../config/schema.js";
 import { failure, success, type CommandResult } from "../contracts/result.js";
 import { inspectGitContext } from "../git/context.js";
-import { githubPreflight } from "../github/preflight.js";
-import { loadProject } from "../github/project.js";
+import { createAuthenticatedGitHubAdapter } from "../github/auth.js";
+import type { GitHubAdapter } from "../github/types.js";
 import { runCommand } from "../runner/command-runner.js";
 import { checkRequiredTools, discoverValidationCommands } from "./discovery.js";
 import { writeInitialization } from "./filesystem.js";
@@ -14,10 +14,11 @@ export interface InitOptions { project: string; validationCommands: string[]; re
 export interface InitSummary { repository: string; project: string; defaultBranch: string; validationCommands: string[]; changed: boolean; dryRun: boolean; }
 export interface InitDependencies {
   execute: typeof runCommand;
+  github: (cwd: string, execute: typeof runCommand) => Promise<CommandResult<GitHubAdapter>>;
   confirm: (message: string) => Promise<boolean>;
   write: typeof writeInitialization;
 }
-const defaults: InitDependencies = { execute: runCommand, confirm: async () => false, write: writeInitialization };
+const defaults: InitDependencies = { execute: runCommand, github: createAuthenticatedGitHubAdapter, confirm: async () => false, write: writeInitialization };
 
 export async function initializeRepository(options: InitOptions, dependencies: InitDependencies = defaults): Promise<CommandResult<InitSummary>> {
   const reference = parseProjectReference(options.project);
@@ -25,9 +26,11 @@ export async function initializeRepository(options: InitOptions, dependencies: I
   const requestedBinding = `${reference.data.owner}/${reference.data.number}`;
   const git = await inspectGitContext(options.cwd, dependencies.execute);
   if (!git.ok) return git;
-  const repository = await githubPreflight(git.data.repository, git.data.root, dependencies.execute);
+  const github = await dependencies.github(git.data.root, dependencies.execute);
+  if (!github.ok) return github;
+  const repository = await github.data.getRepository(git.data.repository);
   if (!repository.ok) return repository;
-  const project = await loadProject(reference.data, repository.data.repository, git.data.root, dependencies.execute);
+  const project = await github.data.getProject(reference.data, repository.data.repository);
   if (!project.ok) return project;
   const tools = await checkRequiredTools(git.data.root, dependencies.execute);
   if (!tools.ok) return tools;

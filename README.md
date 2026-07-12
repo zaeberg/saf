@@ -28,4 +28,4 @@ saf init --project zbrg/5 --validation "pnpm check" --yes
 
 Interactive runs may confirm discovered validation commands. Non-interactive runs must pass each command explicitly with a repeated `--validation` option. Use `--dry-run` to perform preflight checks without writing files. Changing an existing Project binding additionally requires `--rebind` and confirmation (or `--yes`).
 
-Initialization requires authenticated `gh` access and installed `claude`, `ralphex`, `codex` and `revdiff` executables. It creates tracked `.saf/config.yaml`, ignored `.saf/runtime/`, and adds `.saf/config.local.yaml` to `.gitignore`.
+Initialization requires authenticated `gh` access and installed `claude`, `ralphex`, `codex` and `revdiff` executables. SAF obtains the active token from `gh` only in memory and uses Octokit behind its own GitHub adapter; credentials are never written to config or runtime files. Initialization creates tracked `.saf/config.yaml`, ignored `.saf/runtime/`, and adds `.saf/config.local.yaml` to `.gitignore`.

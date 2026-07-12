@@ -11,3 +11,4 @@ export * from "./git/remote.js";
 export * from "./init/init.js";
 export * from "./init/project-reference.js";
 export * from "./prompt/prompt-adapter.js";
+export * from "./github/types.js";

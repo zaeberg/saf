@@ -2,6 +2,7 @@ import { Command, CommanderError, Option } from "commander";
 import { ExitCode, exitCodeFor } from "./contracts/exit-codes.js";
 import { initializeRepository } from "./init/init.js";
 import { writeInitialization } from "./init/filesystem.js";
+import { createAuthenticatedGitHubAdapter } from "./github/auth.js";
 import { renderResult } from "./output.js";
 import { runCommand } from "./runner/command-runner.js";
 
@@ -43,7 +44,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
     .option("--yes", "confirm reviewed validation commands or rebind", false)
     .action(async (options: { project: string; validation: string[]; rebind: boolean; yes: boolean }, command: Command) => {
       const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
-      const result = await initializeRepository({ project: options.project, validationCommands: options.validation, rebind: options.rebind, dryRun: globals.dryRun === true, yes: options.yes, interactive: io.interactive === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, confirm: io.confirm ?? (async () => false), write: writeInitialization });
+      const result = await initializeRepository({ project: options.project, validationCommands: options.validation, rebind: options.rebind, dryRun: globals.dryRun === true, yes: options.yes, interactive: io.interactive === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, confirm: io.confirm ?? (async () => false), write: writeInitialization });
       const rendered = renderResult(result, globals.json === true ? "json" : "human");
       if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
       commandExitCode = exitCodeFor(result.diagnostics);
