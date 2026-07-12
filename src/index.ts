@@ -6,3 +6,7 @@ export * from "./contracts/result.js";
 export * from "./output.js";
 export * from "./runner/command-runner.js";
 export * from "./runner/redact.js";
+export * from "./git/gitignore.js";
+export * from "./git/remote.js";
+export * from "./init/init.js";
+export * from "./init/project-reference.js";

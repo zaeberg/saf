@@ -13,4 +13,11 @@ describe("CLI shell", () => {
     const result = await runCli(["--unknown"], { stdout: () => undefined, stderr: () => undefined });
     expect(result.exitCode).toBe(2);
   });
+
+  it("maps init diagnostics to JSON and stable exit codes", async () => {
+    let stderr = "";
+    const result = await runCli(["init", "--project", "invalid", "--json"], { stdout: () => undefined, stderr: (text) => { stderr += text; } });
+    expect(result.exitCode).toBe(2);
+    expect(JSON.parse(stderr)).toMatchObject({ ok: false, diagnostics: [{ code: "INVALID_ARGUMENT" }] });
+  });
 });

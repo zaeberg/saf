@@ -19,9 +19,14 @@ const exitCodeByDiagnostic: Record<DiagnosticCode, ExitCode> = {
   GITHUB_AUTH_MISSING: ExitCode.PrerequisiteMissing,
   PROJECT_ACCESS_DENIED: ExitCode.PrerequisiteMissing,
   PROJECT_REPOSITORY_DRIFT: ExitCode.InvalidConfig,
+  PROJECT_STATUS_FIELD_MISSING: ExitCode.InvalidConfig,
+  PROJECT_STATUS_OPTION_MISSING: ExitCode.InvalidConfig,
   TOOL_NOT_FOUND: ExitCode.PrerequisiteMissing,
   COMMAND_FAILED: ExitCode.ExternalCommandFailed,
   COMMAND_CANCELLED: ExitCode.Cancelled,
+  REBIND_REQUIRED: ExitCode.InvalidConfig,
+  CONFIRMATION_REQUIRED: ExitCode.InvalidUsage,
+  VALIDATION_COMMANDS_REQUIRED: ExitCode.InvalidUsage,
   INVALID_ARGUMENT: ExitCode.InvalidUsage,
   INTERNAL_ERROR: ExitCode.InternalError
 };
