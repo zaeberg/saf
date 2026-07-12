@@ -16,7 +16,7 @@ export async function runPlanner(root: string, plansDirectory: string, issue: Is
     issue.body || "(empty Issue body)",
     "",
     "Before brainstorming, read AGENTS.md and follow its links to any documentation relevant to this Issue. Discover any other repository context yourself; do not assume the Issue contains enough architectural context.",
-    "Keep the session interactive. Use /brainstorm:do when clarification is needed, then /planning:make.",
+    "Keep the session interactive. Use /brainstorm:brainstorm when clarification is needed, then /planning:make.",
     `Save the final executable plan under ${plansDirectory}. Do not implement the plan.`
   ].join("\n");
   const result = await execute({ command: "claude", args: [prompt], cwd: root, stdio: "inherit" });
