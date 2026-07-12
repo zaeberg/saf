@@ -80,3 +80,7 @@ saf review 42 --sha <full-head-sha>
 ```
 
 SAF requires successful CI, writes a temporary review packet under `.saf/runtime/review/`, and opens the current diff in revdiff. Prefix annotations with `[non-blocking]` when they do not prevent acceptance; `[blocking]` and unprefixed annotations block it. Immediately before publishing, SAF reads the PR head again, then creates the human-readable acceptance comment and `saf/human-acceptance` commit status for that exact SHA. SAF never merges or marks the Project item `Done`.
+
+## Recovery and MVP pilot
+
+The automated recovery, idempotency, marker-presentation and security evidence is mapped in [docs/recovery-and-pilot.md](docs/recovery-and-pilot.md). The same document contains the disposable-task recovery runbook, sanitized 3–5 task pilot report, and the explicit `accepted` / `harden` / `stop` decision gate. The MVP remains `pending pilot` until real task evidence and owner review-cost confirmation are recorded.

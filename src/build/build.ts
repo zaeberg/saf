@@ -11,7 +11,7 @@ import { parseMarkers, serializeMarker, type RunMarker } from "../status/markers
 import { readWorkflowFacts } from "../status/reader.js";
 import { deriveState } from "../status/reducer.js";
 import { checkBuildTools, runRalphex, runValidation, type ValidationEvidence } from "./execution.js";
-import { checkWorkspace, gitValue, pushBranch } from "./git.js";
+import { checkWorkspace, ensureRunBranch, gitValue, pushBranch } from "./git.js";
 import { acquireRunLock } from "./lock.js";
 
 export interface BuildOptions { issue: number; dryRun: boolean; cwd: string; }
@@ -84,9 +84,9 @@ export async function buildIssue(options: BuildOptions, dependencies: BuildDepen
       runCommentIds = published.data;
     }
 
-    const currentBranch = await gitValue(git.data.root, ["branch", "--show-current"], dependencies.execute);
-    if (!currentBranch.ok) return await failBuild(github.data, config.data, facts.data.projectItem.id, currentMarker, runCommentIds, "git", currentBranch);
-    if (currentBranch.data !== branch || branch === config.data.repository.defaultBranch) return await failBuild(github.data, config.data, facts.data.projectItem.id, currentMarker, runCommentIds, "git", failure([{ code: "BRANCH_INVALID", severity: "error", message: `Expected branch ${branch}, got ${currentBranch.data}.`, remediation: "Inspect Ralphex branch creation before retrying." }]));
+    if (branch === config.data.repository.defaultBranch) return await failBuild(github.data, config.data, facts.data.projectItem.id, currentMarker, runCommentIds, "git", failure([{ code: "BRANCH_INVALID", severity: "error", message: "Implementation branch cannot be the default branch.", remediation: "Inspect the run marker before retrying." }]));
+    const checkedOut = await ensureRunBranch(git.data.root, branch, facts.data.git.localBranches, facts.data.git.remoteBranches, dependencies.execute);
+    if (!checkedOut.ok) return await failBuild(github.data, config.data, facts.data.projectItem.id, currentMarker, runCommentIds, "git", checkedOut);
     const commits = await gitValue(git.data.root, ["rev-list", "--count", `${config.data.repository.defaultBranch}..HEAD`], dependencies.execute);
     if (!commits.ok || Number(commits.data) < 1) return await failBuild(github.data, config.data, facts.data.projectItem.id, currentMarker, runCommentIds, "git", failure([{ code: "BRANCH_INVALID", severity: "error", message: "Implementation branch has no commits over default branch.", remediation: "Complete the approved plan before creating a PR." }]));
     const clean = await checkWorkspace(git.data.root, plan.planPath, dependencies.execute);

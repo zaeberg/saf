@@ -19,7 +19,12 @@ describe("saf shape integration", () => {
     const first = await shapeIssue(options, dependencies);
     expect(first).toMatchObject({ ok: true, data: { state: "Ready", revision: 1, commentChanged: true } });
     expect(github.statuses).toEqual(["Shaping", "Ready"]);
+
+    github.setProjectStatus("Shaping");
+    const recovered = await shapeIssue(options, dependencies);
+    expect(recovered).toMatchObject({ ok: true, data: { revision: 1, commentChanged: false } });
     expect(github.comments).toHaveLength(1);
+    expect(github.statuses).toEqual(["Shaping", "Ready", "Ready"]);
     const parsed = parseMarkers(github.issue.comments, 42);
     expect(parsed.approvedPlan).toMatchObject({ revision: 1, issue: 42 });
     expect(github.comments[0]).toContain("**SAF · Approved plan**");
@@ -27,7 +32,7 @@ describe("saf shape integration", () => {
     const second = await shapeIssue(options, dependencies);
     expect(second).toMatchObject({ ok: true, data: { revision: 1, commentChanged: false } });
     expect(github.comments).toHaveLength(1);
-    expect(github.statuses).toEqual(["Shaping", "Ready"]);
+    expect(github.statuses).toEqual(["Shaping", "Ready", "Ready"]);
   });
 
   it("does not publish or transition during dry-run", async () => {
@@ -96,7 +101,7 @@ async function shapeFixture(): Promise<{ root: string; planPath: string }> {
   return { root, planPath };
 }
 
-function statefulAdapter(): { adapter: GitHubAdapter; issue: IssueDetails; statuses: string[]; comments: string[] } {
+function statefulAdapter(): { adapter: GitHubAdapter; issue: IssueDetails; statuses: string[]; comments: string[]; setProjectStatus(status: string): void } {
   const statuses: string[] = [];
   const comments: string[] = [];
   const issue: IssueDetails = { number: 42, title: "Shape me", state: "open", body: "Outcome", comments: [] };
@@ -117,7 +122,7 @@ function statefulAdapter(): { adapter: GitHubAdapter; issue: IssueDetails; statu
     addPullRequestToProject: async () => success(undefined),
     createCommitStatus: async () => success(undefined)
   };
-  return { adapter, issue, statuses, comments };
+  return { adapter, issue, statuses, comments, setProjectStatus(status: string) { projectStatus = status; } };
 }
 
 function shapeDependencies(root: string, adapter: GitHubAdapter) {

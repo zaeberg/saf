@@ -70,6 +70,20 @@ describe("saf build integration", () => {
     expect(harness.ralphex).not.toHaveBeenCalled();
     expect(github.statuses).toEqual(["Review"]);
   });
+
+  it("recovers an interrupted Ralphex execution on the next build", async () => {
+    const fixture = await buildFixture();
+    const github = statefulAdapter(fixture.approvedComment);
+    const harness = dependencies(fixture.root, github.adapter);
+    harness.ralphex.mockResolvedValueOnce(failure([{ code: "COMMAND_CANCELLED", severity: "error", message: "interrupted", remediation: "retry" }]));
+    const interrupted = await buildIssue({ issue: 42, dryRun: false, cwd: fixture.root }, harness.dependencies);
+    expect(interrupted).toMatchObject({ ok: false, diagnostics: [{ code: "COMMAND_CANCELLED" }] });
+    expect(parseMarkers(github.issue.comments, 42).run).toMatchObject({ state: "failed", failurePhase: "execution" });
+    const recovered = await buildIssue({ issue: 42, dryRun: false, cwd: fixture.root }, harness.dependencies);
+    expect(recovered).toMatchObject({ ok: true, data: { state: "Review", pullRequest: 7 } });
+    expect(harness.ralphex).toHaveBeenCalledTimes(2);
+    expect(github.statuses).toEqual(["Running", "Blocked", "Review"]);
+  });
 });
 
 async function buildFixture() {

@@ -34,6 +34,14 @@ describe("SAF markers", () => {
     expect(parsed.findings).toMatchObject([{ code: "MARKER_UNKNOWN_VERSION" }]);
   });
 
+  it("rejects a damaged hidden envelope even when the visible summary remains readable", () => {
+    const body = serializeMarker(approved).replace(/(saf:marker:v1:)[A-Za-z0-9_-]+/, "$1damaged");
+    const parsed = parseMarkers([{ id: 1, body }], 42);
+    expect(body).toContain("**SAF · Approved plan**");
+    expect(parsed.approvedPlan).toBeUndefined();
+    expect(parsed.findings).toContainEqual(expect.objectContaining({ code: "MARKER_INVALID" }));
+  });
+
   it("detects plan hash drift", () => {
     const marker = { ...approved, plan: `${approved.plan}changed` };
     expect(parseMarkers([{ id: 1, body: serializeMarker(marker) }], 42).findings).toContainEqual(expect.objectContaining({ code: "PLAN_HASH_MISMATCH" }));

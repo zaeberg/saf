@@ -83,6 +83,16 @@ describe("saf review integration", () => {
     expect(reviewer).not.toHaveBeenCalled();
     expect(github.statuses).toEqual([]);
   });
+
+  it("is a no-op when the current SHA already has acceptance status", async () => {
+    const fixture = await reviewFixture();
+    const github = statefulAdapter(fixture, { acceptedCurrent: true });
+    const reviewer = vi.fn(async () => success({ annotations: [] }));
+    const result = await reviewIssue(options(fixture), dependencies(fixture, github.adapter, reviewer));
+    expect(result).toMatchObject({ ok: true, data: { state: "Accepted", sha: fixture.sha } });
+    expect(reviewer).not.toHaveBeenCalled();
+    expect(github.statuses).toEqual([]);
+  });
 });
 
 async function reviewFixture() {
@@ -95,7 +105,7 @@ async function reviewFixture() {
   return { root, sha, approved, run };
 }
 
-function statefulAdapter(fixture: Awaited<ReturnType<typeof reviewFixture>>, behavior: { ciState?: "success" | "failure" | "pending" | "missing"; changedHead?: string; oldAcceptanceSha?: string } = {}) {
+function statefulAdapter(fixture: Awaited<ReturnType<typeof reviewFixture>>, behavior: { ciState?: "success" | "failure" | "pending" | "missing"; changedHead?: string; oldAcceptanceSha?: string; acceptedCurrent?: boolean } = {}) {
   const issue: IssueDetails = { number: 42, title: "Review feature", state: "open", body: "Expected outcome", comments: [comment(1, serializeMarker(fixture.approved)), comment(2, serializeMarker(fixture.run))] };
   const pr: PullRequestDetails = { number: 7, title: "Review feature", body: "- Validation:\n  - `pnpm check`: exit 0", state: "open", draft: true, merged: false, headSha: fixture.sha, branch: "saf/42", url: "https://example.test/pr/7", comments: [], changedFiles: ["src/review.ts"] };
   if (behavior.oldAcceptanceSha) pr.comments.push(comment(10, serializeMarker({ version: 1, kind: "human-acceptance", issue: 42, sha: behavior.oldAcceptanceSha, acceptedAt: "2026-07-11T00:00:00.000Z" })));
@@ -105,7 +115,7 @@ function statefulAdapter(fixture: Awaited<ReturnType<typeof reviewFixture>>, beh
     getRepository: async () => success({ repository: "zbrg/saf", defaultBranch: "master" }), getProject: async () => success({ id: "project", title: "SAF", statusFieldId: "status", statusOptions: [] }),
     getIssue: async () => success(issue), getProjectItem: async () => success({ id: "item", status: "Review" }),
     getPullRequest: async () => { reads += 1; return success(reads > 1 && behavior.changedHead ? { ...pr, headSha: behavior.changedHead } : pr); },
-    getChecks: async () => success({ state: behavior.ciState ?? "success", total: 1, failing: [] }), getCommitStatus: async (_repository, sha) => success({ present: false, sha }),
+    getChecks: async () => success({ state: behavior.ciState ?? "success", total: 1, failing: [] }), getCommitStatus: async (_repository, sha) => success({ present: behavior.acceptedCurrent === true, sha }),
     setProjectItemStatus: async () => success(undefined),
     createIssueComment: async (_repository, _issue, body) => { const id = pr.comments.length + 10; pr.comments.push(comment(id, body)); return success({ id }); },
     updateIssueComment: async (_repository, id, body) => { const index = pr.comments.findIndex((item) => item.id === id); pr.comments[index] = comment(id, body); return success({ id }); },
