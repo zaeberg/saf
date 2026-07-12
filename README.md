@@ -275,7 +275,9 @@ saf build 42 --tasks-only --task-model gpt-5.4:high
 7. создаёт или обновляет один Draft Pull Request;
 8. переводит item в `Review` либо в `Blocked` при ошибке.
 
-`--tasks-only` пропускает review phases Ralphex. `--task-model <model[:effort]>` переопределяет task model. Повторный запуск обновляет тот же run marker, продолжает оригинальный plan и после успеха меняет `failed/Blocked` на `succeeded/Review`.
+В интерактивном терминале SAF перед запуском предлагает выбрать режим `Full` или `Tasks only` и task model. Значения из `execution.tasksOnly` и `execution.taskModel` уже выбраны как defaults; пустая model оставляет выбор Ralphex. Флаги `--tasks-only` и `--task-model <model[:effort]>` переопределяют соответствующие значения и пропускают вопросы для них. В non-interactive режиме и при `--dry-run` вопросы не задаются.
+
+Повторный запуск обновляет тот же run marker, продолжает оригинальный plan и после успеха меняет `failed/Blocked` на `succeeded/Review`.
 
 ### `saf review <issue>`
 
@@ -287,7 +289,9 @@ saf review 42
 saf review 42 --review-model gpt-5.4:high --external-review-tool none
 ```
 
-Команда вызывает `ralphex --review --codex` с оригинальным plan, выполняет configured validation и push-ит обновлённую branch без force. `--review-model <model[:effort]>` выбирает модель review, а `--external-review-tool <codex|custom|none>` управляет external review loop. Human review, перевод Draft PR в Ready и merge выполняются в GitHub.
+Команда вызывает `ralphex --review --codex` с оригинальным plan, выполняет configured validation и push-ит обновлённую branch без force. В интерактивном терминале SAF предлагает выбрать external review tool и review model, используя `review.externalReviewTool` и `review.model` как defaults. Пустая model оставляет выбор Ralphex. Флаги `--review-model <model[:effort]>` и `--external-review-tool <codex|custom|none>` переопределяют соответствующие значения и пропускают вопросы для них. В non-interactive режиме и при `--dry-run` вопросы не задаются.
+
+Human review, перевод Draft PR в Ready и merge выполняются в GitHub.
 
 ## Общие опции
 

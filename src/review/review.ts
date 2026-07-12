@@ -9,16 +9,18 @@ import type { GitHubAdapter } from "../github/types.js";
 import { runCommand } from "../runner/command-runner.js";
 import { loadAndLintPlan } from "../shape/plan.js";
 import { readWorkflowFacts } from "../status/reader.js";
+import type { PromptAdapter } from "../prompt/prompt-adapter.js";
 
-export interface ReviewOptions { issue: number; dryRun: boolean; cwd: string; reviewModel?: string; externalReviewTool?: RalphexReviewOptions["externalReviewTool"]; }
+export interface ReviewOptions { issue: number; dryRun: boolean; interactive?: boolean; cwd: string; reviewModel?: string; externalReviewTool?: RalphexReviewOptions["externalReviewTool"]; }
 export interface ReviewSummary { issue: number; state: "DryRun" | "Reviewed"; pullRequest: number; branch: string; planPath: string; }
 export interface ReviewDependencies {
   execute: typeof runCommand;
   github: (cwd: string, execute: typeof runCommand) => Promise<CommandResult<GitHubAdapter>>;
   ralphex: typeof runRalphexReview;
   validation: typeof runValidation;
+  prompt: Pick<PromptAdapter, "input" | "select">;
 }
-const defaults: ReviewDependencies = { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphexReview, validation: runValidation };
+const defaults: ReviewDependencies = { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphexReview, validation: runValidation, prompt: { input: async (_message, value = "") => value, select: async (_message, _choices, value) => value } };
 
 export async function reviewIssue(options: ReviewOptions, dependencies: ReviewDependencies = defaults): Promise<CommandResult<ReviewSummary>> {
   if (!Number.isInteger(options.issue) || options.issue <= 0) return failure([{ code: "INVALID_ARGUMENT", severity: "error", message: `Invalid Issue number: ${options.issue}`, remediation: "Pass a positive GitHub Issue number." }]);
@@ -39,12 +41,21 @@ export async function reviewIssue(options: ReviewOptions, dependencies: ReviewDe
   const tools = await checkBuildTools(git.data.root, dependencies.execute);
   if (!tools.ok) return tools;
   if (options.dryRun) return success({ issue: options.issue, state: "DryRun", pullRequest: pullRequest.number, branch: facts.data.run.branch, planPath });
+  let externalReviewTool = options.externalReviewTool ?? config.data.review.externalReviewTool;
+  let reviewModel = options.reviewModel ?? config.data.review.model;
+  if (options.interactive) {
+    if (options.externalReviewTool === undefined) externalReviewTool = await dependencies.prompt.select("External review tool", [
+      { name: "None", value: "none" as const },
+      { name: "Codex", value: "codex" as const },
+      { name: "Custom", value: "custom" as const }
+    ], externalReviewTool);
+    if (options.reviewModel === undefined) reviewModel = normalizeModel(await dependencies.prompt.input("Review model (empty uses Ralphex default)", reviewModel));
+  }
   const branch = await ensureRunBranch(git.data.root, facts.data.run.branch, facts.data.git.localBranches, facts.data.git.remoteBranches, dependencies.execute);
   if (!branch.ok) return branch;
-  const reviewModel = options.reviewModel ?? config.data.review.model;
   const reviewed = await dependencies.ralphex(git.data.root, planPath, {
     baseRef: config.data.repository.defaultBranch,
-    externalReviewTool: options.externalReviewTool ?? config.data.review.externalReviewTool,
+    externalReviewTool,
     ...(reviewModel ? { reviewModel } : {})
   }, dependencies.execute);
   if (!reviewed.ok) return reviewed;
@@ -53,4 +64,9 @@ export async function reviewIssue(options: ReviewOptions, dependencies: ReviewDe
   const pushed = await pushBranch(git.data.root, facts.data.run.branch, dependencies.execute);
   if (!pushed.ok) return pushed;
   return success({ issue: options.issue, state: "Reviewed", pullRequest: pullRequest.number, branch: facts.data.run.branch, planPath });
+}
+
+function normalizeModel(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
 }

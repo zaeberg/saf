@@ -58,6 +58,19 @@ describe("saf build integration", () => {
     expect(github.statuses).toEqual([]);
     expect(github.prInputs).toEqual([]);
     expect(harness.ralphex).not.toHaveBeenCalled();
+    expect(harness.prompt.select).not.toHaveBeenCalled();
+    expect(harness.prompt.input).not.toHaveBeenCalled();
+  });
+
+  it("uses interactive build choices instead of configured defaults", async () => {
+    const fixture = await buildFixture();
+    const github = statefulAdapter(fixture.approvedComment);
+    const harness = dependencies(fixture.root, github.adapter);
+    harness.prompt.select.mockResolvedValueOnce(true);
+    harness.prompt.input.mockResolvedValueOnce("gpt-5.4:high");
+    const result = await buildIssue({ issue: 42, dryRun: false, interactive: true, cwd: fixture.root }, harness.dependencies);
+    expect(result.ok).toBe(true);
+    expect(harness.ralphex).toHaveBeenCalledWith(fixture.root, join(fixture.root, "docs/plans/42.md"), fixture.branch, { tasksOnly: true, taskModel: "gpt-5.4:high" }, expect.any(Function));
   });
 
   it("recovers after execution without running Ralphex twice", async () => {
@@ -146,9 +159,14 @@ function dependencies(root: string, adapter: GitHubAdapter, failValidation = fal
   const validation = vi.fn(async () => failValidation
     ? failure<ValidationEvidence[]>([{ code: "VALIDATION_FAILED", severity: "error", message: "tests failed", remediation: "fix" }])
     : success([{ command: "pnpm check", exitCode: 0, completedAt: "2026-07-12T00:00:00Z" }]));
+  const prompt = {
+    input: vi.fn(async (_message: string, value = "") => value),
+    select: vi.fn(async <T>(_message: string, _choices: readonly { name: string; value: T }[], value: T) => value)
+  };
   return {
-    dependencies: { execute, github: async () => success(adapter), ralphex, validation },
+    dependencies: { execute, github: async () => success(adapter), ralphex, validation, prompt },
     ralphex,
+    prompt,
     setBranch(value: string) { branch = value; },
     pushes: () => invocations.filter((item) => item.command === "git" && item.args?.[0] === "push").map((item) => item.args)
   };

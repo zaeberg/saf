@@ -6,7 +6,9 @@ const result = await runCli(process.argv.slice(2), {
   stdout: (text) => process.stdout.write(text),
   stderr: (text) => process.stderr.write(text),
   interactive: process.stdin.isTTY,
-  confirm: process.stdin.isTTY ? terminalPromptAdapter.confirm : async () => false
+  confirm: process.stdin.isTTY ? terminalPromptAdapter.confirm : async () => false,
+  input: process.stdin.isTTY ? terminalPromptAdapter.input : async (_message, value = "") => value,
+  select: process.stdin.isTTY ? terminalPromptAdapter.select : async (_message, _choices, value) => value
 });
 
 process.exitCode = result.exitCode;

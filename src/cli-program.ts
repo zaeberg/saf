@@ -12,11 +12,14 @@ import { runPlanner } from "./shape/planner.js";
 import { buildIssue } from "./build/build.js";
 import { runRalphex, runRalphexReview, runValidation } from "./build/execution.js";
 import { reviewIssue } from "./review/review.js";
+import type { PromptAdapter } from "./prompt/prompt-adapter.js";
 
 export interface CliIo {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
   confirm?: (message: string) => Promise<boolean>;
+  input?: PromptAdapter["input"];
+  select?: PromptAdapter["select"];
   cwd?: string;
   interactive?: boolean;
 }
@@ -87,7 +90,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
     .option("--task-model <model>", "Ralphex task model as model[:effort]")
     .action(async (issueValue: string, options: { tasksOnly?: boolean; taskModel?: string }, command: Command) => {
       const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
-      const result = await buildIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, ...(options.tasksOnly === true ? { tasksOnly: true } : {}), ...(options.taskModel ? { taskModel: options.taskModel } : {}), cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphex, validation: runValidation });
+      const result = await buildIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, interactive: io.interactive === true, ...(options.tasksOnly === true ? { tasksOnly: true } : {}), ...(options.taskModel ? { taskModel: options.taskModel } : {}), cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphex, validation: runValidation, prompt: promptFromIo(io) });
       const rendered = renderResult(result, globals.json === true ? "json" : "human");
       if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
       commandExitCode = exitCodeFor(result.diagnostics);
@@ -103,7 +106,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
       const tool = options.externalReviewTool;
       const validTool = tool === undefined || tool === "codex" || tool === "custom" || tool === "none";
       const result = validTool
-        ? await reviewIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, ...(options.reviewModel ? { reviewModel: options.reviewModel } : {}), ...(tool ? { externalReviewTool: tool } : {}), cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphexReview, validation: runValidation })
+        ? await reviewIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, interactive: io.interactive === true, ...(options.reviewModel ? { reviewModel: options.reviewModel } : {}), ...(tool ? { externalReviewTool: tool } : {}), cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphexReview, validation: runValidation, prompt: promptFromIo(io) })
         : failureReviewTool(tool);
       const rendered = renderResult(result, globals.json === true ? "json" : "human");
       if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
@@ -122,6 +125,13 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
     }
     throw error;
   }
+}
+
+function promptFromIo(io: CliIo): Pick<PromptAdapter, "input" | "select"> {
+  return {
+    input: io.input ?? (async (_message, value = "") => value),
+    select: io.select ?? (async (_message, _choices, value) => value)
+  };
 }
 
 function failureReviewTool(tool: string) {

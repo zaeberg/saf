@@ -13,16 +13,18 @@ import { checkBuildTools, runRalphex, runValidation, type ValidationEvidence } f
 import { loadAndLintPlan } from "../shape/plan.js";
 import { checkWorkspace, ensureRunBranch, gitValue, pushBranch } from "./git.js";
 import { acquireRunLock } from "./lock.js";
+import type { PromptAdapter } from "../prompt/prompt-adapter.js";
 
-export interface BuildOptions { issue: number; dryRun: boolean; cwd: string; tasksOnly?: boolean; taskModel?: string; }
+export interface BuildOptions { issue: number; dryRun: boolean; interactive?: boolean; cwd: string; tasksOnly?: boolean; taskModel?: string; }
 export interface BuildSummary { issue: number; state: "DryRun" | "Review"; runId: string; branch: string; pullRequest: number | null; validation: ValidationEvidence[]; }
 export interface BuildDependencies {
   execute: typeof runCommand;
   github: (cwd: string, execute: typeof runCommand) => Promise<CommandResult<GitHubAdapter>>;
   ralphex: typeof runRalphex;
   validation: typeof runValidation;
+  prompt: Pick<PromptAdapter, "input" | "select">;
 }
-const defaults: BuildDependencies = { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphex, validation: runValidation };
+const defaults: BuildDependencies = { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphex, validation: runValidation, prompt: { input: async (_message, value = "") => value, select: async (_message, _choices, value) => value } };
 
 export async function buildIssue(options: BuildOptions, dependencies: BuildDependencies = defaults): Promise<CommandResult<BuildSummary>> {
   if (!Number.isInteger(options.issue) || options.issue <= 0) return failure([{ code: "INVALID_ARGUMENT", severity: "error", message: `Invalid Issue number: ${options.issue}`, remediation: "Pass a positive GitHub Issue number." }]);
@@ -54,6 +56,16 @@ export async function buildIssue(options: BuildOptions, dependencies: BuildDepen
   const runId = facts.data.run?.runId ?? `${options.issue}-${plan.sha256.slice(0, 12)}`;
   const branch = facts.data.run?.branch ?? `saf/${options.issue}-${plan.sha256.slice(0, 12)}`;
   if (options.dryRun) return success({ issue: options.issue, state: "DryRun", runId, branch, pullRequest: facts.data.pullRequest?.number ?? null, validation: [] });
+  const willExecute = !facts.data.run || facts.data.run.state === "started" || facts.data.run.failurePhase === "execution";
+  let tasksOnly = options.tasksOnly ?? config.data.execution.tasksOnly;
+  let taskModel = options.taskModel ?? config.data.execution.taskModel;
+  if (options.interactive && willExecute) {
+    if (options.tasksOnly === undefined) tasksOnly = await dependencies.prompt.select("Ralphex build mode", [
+      { name: "Full (tasks and reviews)", value: false },
+      { name: "Tasks only", value: true }
+    ], tasksOnly);
+    if (options.taskModel === undefined) taskModel = normalizeModel(await dependencies.prompt.input("Task model (empty uses Ralphex default)", taskModel));
+  }
 
   const lock = await acquireRunLock(join(git.data.root, ".saf/runtime/build.lock"), options.issue);
   if (!lock.ok) return lock;
@@ -72,8 +84,7 @@ export async function buildIssue(options: BuildOptions, dependencies: BuildDepen
     }
     const shouldExecute = currentMarker.state === "started" || currentMarker.failurePhase === "execution";
     if (shouldExecute) {
-      const taskModel = options.taskModel ?? config.data.execution.taskModel;
-      const execution = await dependencies.ralphex(git.data.root, planPath, branch, { tasksOnly: options.tasksOnly ?? config.data.execution.tasksOnly, ...(taskModel ? { taskModel } : {}) }, dependencies.execute);
+      const execution = await dependencies.ralphex(git.data.root, planPath, branch, { tasksOnly, ...(taskModel ? { taskModel } : {}) }, dependencies.execute);
       if (!execution.ok) return await failBuild(github.data, config.data, facts.data.projectItem.id, currentMarker, runCommentIds, "execution", execution);
       currentMarker = { ...currentMarker, state: "succeeded", completedAt: new Date().toISOString() };
       const published = await publishRun(github.data, config.data.github.repository, options.issue, currentMarker, runCommentIds);
@@ -108,6 +119,11 @@ export async function buildIssue(options: BuildOptions, dependencies: BuildDepen
     if (!review.ok) return await failBuild(github.data, config.data, facts.data.projectItem.id, currentMarker, runCommentIds, "project", review);
     return success(summary(options.issue, "Review", runId, branch, pr.data, validation.data));
   } finally { await lock.data.release(); }
+}
+
+function normalizeModel(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
 }
 
 async function publishRun(github: GitHubAdapter, repository: string, issue: number, marker: RunMarker, ids: number[]): Promise<CommandResult<number[]>> {
