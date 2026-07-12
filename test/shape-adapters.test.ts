@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -29,9 +29,24 @@ describe("shape external adapters", () => {
 
   it("maps revdiff annotations from exit code 10", async () => {
     const root = await mkdtemp(join(tmpdir(), "saf-review-"));
-    const execute = vi.fn(async (invocation: CommandInvocation) => execution(invocation, 10));
-    await expect(reviewPlan(root, join(root, "plan.md"), join(root, ".saf/runtime/shape/annotations.md"), execute)).resolves.toEqual({ ok: true, data: { annotations: true }, diagnostics: [] });
-    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ command: "revdiff", stdio: "inherit", acceptedExitCodes: [0, 10] }));
+    const planPath = join(root, "plan.md");
+    const annotationsPath = join(root, ".saf/runtime/shape/annotations.md");
+    await writeFile(planPath, "# Plan\n");
+    const execute = vi.fn(async (invocation: CommandInvocation) => {
+      const oldArgument = invocation.args?.find((argument) => argument.startsWith("--compare-old="));
+      const oldPath = oldArgument?.slice("--compare-old=".length);
+      expect(oldPath).toBe(join(root, ".saf/runtime/shape/empty-plan.md"));
+      expect((await stat(oldPath!)).isFile()).toBe(true);
+      return execution(invocation, 10);
+    });
+    await expect(reviewPlan(root, planPath, annotationsPath, execute)).resolves.toEqual({ ok: true, data: { annotations: true }, diagnostics: [] });
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ command: "revdiff", args: [
+      `--compare-old=${join(root, ".saf/runtime/shape/empty-plan.md")}`,
+      `--compare-new=${planPath}`,
+      `--output=${annotationsPath}`,
+      "--exit-code-on-annotations",
+      "--description=SAF plan review: plan.md"
+    ], stdio: "inherit", acceptedExitCodes: [0, 10] }));
   });
 
   it("returns an annotated plan to an interactive revision session", async () => {
