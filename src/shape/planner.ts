@@ -1,14 +1,24 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { failure, success, type CommandResult } from "../contracts/result.js";
+import type { IssueDetails } from "../github/types.js";
 import { runCommand, type CommandInvocation } from "../runner/command-runner.js";
 
 export type PlannerExecutor = (invocation: CommandInvocation) => ReturnType<typeof runCommand>;
 
-export async function runPlanner(root: string, plansDirectory: string, contextPath: string, issue: number, execute: PlannerExecutor = runCommand): Promise<CommandResult<string>> {
+export async function runPlanner(root: string, plansDirectory: string, issue: IssueDetails, execute: PlannerExecutor = runCommand): Promise<CommandResult<string>> {
   const directory = join(root, plansDirectory);
   const before = await planSnapshot(directory);
-  const prompt = `Shape GitHub Issue #${issue} using the prepared context at ${relative(root, contextPath)}. Keep the session interactive. Use /brainstorm:do when clarification is needed, then /planning:make. Save the final executable plan under ${plansDirectory}. Do not implement the plan.`;
+  const prompt = [
+    `Shape GitHub Issue #${issue.number}.`,
+    `Title: ${issue.title}`,
+    "",
+    issue.body || "(empty Issue body)",
+    "",
+    "Before brainstorming, read AGENTS.md and follow its links to any documentation relevant to this Issue. Discover any other repository context yourself; do not assume the Issue contains enough architectural context.",
+    "Keep the session interactive. Use /brainstorm:do when clarification is needed, then /planning:make.",
+    `Save the final executable plan under ${plansDirectory}. Do not implement the plan.`
+  ].join("\n");
   const result = await execute({ command: "claude", args: [prompt], cwd: root, stdio: "inherit" });
   if (!result.ok) return failure([{ code: "COMMAND_FAILED", severity: "error", message: "Claude Code planning session failed or was cancelled.", remediation: "Resolve planner availability and rerun saf shape." }]);
   const after = await planSnapshot(directory);

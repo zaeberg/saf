@@ -15,8 +15,6 @@ export const configSchemaV1 = z.strictObject({
     defaultBranch: z.string().min(1)
   }),
   documentation: z.strictObject({
-    projectFile: z.string().min(1),
-    agentsFile: z.string().min(1),
     plansDirectory: z.string().min(1)
   }),
   planning: z.strictObject({

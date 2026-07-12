@@ -100,7 +100,7 @@ saf init --project zbrg/7 --rebind
 1. Проверить Git repository, GitHub remote, Issue и доступность planner adapter.
 2. Проверить, что Issue принадлежит configured repository и добавлен в configured GitHub Project.
 3. Перевести Project item в `Shaping`.
-4. Загрузить Issue, `PROJECT.md`, `AGENTS.md`, project configuration и необходимый repository context.
+4. Передать planner содержимое Issue и поручить ему сначала прочитать repository-local `AGENTS.md`, который содержит правила и ссылки на релевантную документацию.
 5. Запустить Claude Code + GLM для интерактивного brainstorm.
 6. Позволить человеку уточнить problem, desired outcome, non-goals и acceptance criteria.
 7. Запустить `/planning:make` и получить plan-файл.
@@ -233,8 +233,6 @@ repository:
   defaultBranch: main
 
 documentation:
-  projectFile: PROJECT.md
-  agentsFile: AGENTS.md
   plansDirectory: docs/plans/active
 
 planning:

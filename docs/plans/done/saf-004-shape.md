@@ -26,7 +26,7 @@ Marker публикуется только через общий `serializeMarke
 
 - Использовать state reducer и разрешённые starting states.
 - Проверить Issue/repository/Project consistency.
-- Собрать Issue, `PROJECT.md`, `AGENTS.md`, config и релевантный repository context.
+- Передать planner Issue и поручить ему прочитать repository-local `AGENTS.md`, следуя ссылкам на релевантную документацию.
 - Перевести Project item в `Shaping` только после preflight.
 
 ### Task 2 — Planner adapter

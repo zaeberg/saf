@@ -94,7 +94,6 @@ async function shapeFixture(): Promise<{ root: string; planPath: string }> {
   await mkdir(join(root, ".git"));
   await mkdir(join(root, ".saf"));
   await writeFile(join(root, ".saf/config.yaml"), stringify(config));
-  await writeFile(join(root, "PROJECT.md"), "# Project\n");
   await writeFile(join(root, "AGENTS.md"), "# Agents\n");
   const planPath = join(root, "plan.md");
   await writeFile(planPath, validPlan);
@@ -132,8 +131,7 @@ function shapeDependencies(root: string, adapter: GitHubAdapter) {
     prompt: { confirm: async () => true },
     planner: async () => failure<string>([]),
     reviser: async () => success(undefined),
-    reviewer: async () => success({ annotations: false }),
-    context: async () => success(join(root, "context.md"))
+    reviewer: async () => success({ annotations: false })
   };
 }
 
@@ -145,12 +143,11 @@ function executor(root: string) {
     else if (args[0] === "remote") stdout = "git@github.com:zbrg/saf.git";
     else if (args.includes("--show-current")) stdout = "master";
     else if (args.includes("--format=%(refname:short)")) stdout = "master";
-    else if (args[0] === "ls-files") stdout = "PROJECT.md\nAGENTS.md\n";
     return success<CommandExecution>({ command: invocation.command, args, exitCode: 0, stdout, stderr: "", dryRun: false });
   };
 }
 
-const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { projectFile: "PROJECT.md", agentsFile: "AGENTS.md", plansDirectory: "docs/plans/active" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1 }, review: { adapter: "revdiff" }, validation: { commands: ["pnpm check"] } };
+const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { plansDirectory: "docs/plans/active" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1 }, review: { adapter: "revdiff" }, validation: { commands: ["pnpm check"] } };
 const validPlan = `# Plan
 
 ## Goal

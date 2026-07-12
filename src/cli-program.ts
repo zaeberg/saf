@@ -10,7 +10,6 @@ import { getStatus } from "./status/status.js";
 import { shapeIssue } from "./shape/shape.js";
 import { revisePlan, runPlanner } from "./shape/planner.js";
 import { reviewPlan } from "./shape/review.js";
-import { writePlanningContext } from "./shape/context.js";
 import { buildIssue } from "./build/build.js";
 import { runRalphex, runValidation } from "./build/execution.js";
 import { reviewIssue } from "./review/review.js";
@@ -81,7 +80,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
     .action(async (issueValue: string, options: { plan?: string; yes: boolean }, command: Command) => {
       const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
       const confirm = io.confirm ?? (async () => false);
-      const result = await shapeIssue({ issue: Number(issueValue), ...(options.plan ? { planPath: options.plan } : {}), dryRun: globals.dryRun === true, yes: options.yes, interactive: io.interactive === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, prompt: { confirm }, planner: runPlanner, reviser: revisePlan, reviewer: reviewPlan, context: writePlanningContext });
+      const result = await shapeIssue({ issue: Number(issueValue), ...(options.plan ? { planPath: options.plan } : {}), dryRun: globals.dryRun === true, yes: options.yes, interactive: io.interactive === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, prompt: { confirm }, planner: runPlanner, reviser: revisePlan, reviewer: reviewPlan });
       const rendered = renderResult(result, globals.json === true ? "json" : "human");
       if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
       commandExitCode = exitCodeFor(result.diagnostics);

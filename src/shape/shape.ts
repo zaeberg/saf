@@ -9,7 +9,6 @@ import { runCommand } from "../runner/command-runner.js";
 import { readWorkflowFacts } from "../status/reader.js";
 import { deriveState } from "../status/reducer.js";
 import { hashPlan, parseMarkers, serializeMarker, type ApprovedPlanMarker } from "../status/markers.js";
-import { writePlanningContext } from "./context.js";
 import { loadAndLintPlan } from "./plan.js";
 import { revisePlan, runPlanner } from "./planner.js";
 import { reviewPlan } from "./review.js";
@@ -23,9 +22,8 @@ export interface ShapeDependencies {
   planner: typeof runPlanner;
   reviser: typeof revisePlan;
   reviewer: typeof reviewPlan;
-  context: typeof writePlanningContext;
 }
-const defaults: ShapeDependencies = { execute: runCommand, github: createAuthenticatedGitHubAdapter, prompt: { confirm: async () => false }, planner: runPlanner, reviser: revisePlan, reviewer: reviewPlan, context: writePlanningContext };
+const defaults: ShapeDependencies = { execute: runCommand, github: createAuthenticatedGitHubAdapter, prompt: { confirm: async () => false }, planner: runPlanner, reviser: revisePlan, reviewer: reviewPlan };
 
 export async function shapeIssue(options: ShapeOptions, dependencies: ShapeDependencies = defaults): Promise<CommandResult<ShapeSummary>> {
   if (!Number.isInteger(options.issue) || options.issue <= 0) return failure([{ code: "INVALID_ARGUMENT", severity: "error", message: `Invalid Issue number: ${options.issue}`, remediation: "Pass a positive GitHub Issue number." }]);
@@ -48,15 +46,13 @@ export async function shapeIssue(options: ShapeOptions, dependencies: ShapeDepen
   if (!planPath && !options.interactive) return failure([{ code: "PLAN_NOT_FOUND", severity: "error", message: "Interactive planner is unavailable in a non-interactive terminal.", remediation: "Run in a TTY or pass --plan <path>." }]);
 
   if (!planPath) {
-    const context = await dependencies.context(git.data.root, config.data, facts.data.issue, dependencies.execute);
-    if (!context.ok) return context;
     if (!options.dryRun && facts.data.projectItem.status !== "Shaping") {
       const transition = await github.data.setProjectItemStatus(config.data.github.project, config.data.github.repository, facts.data.projectItem.id, "Shaping");
       if (!transition.ok) return transition;
       projectStatus = "Shaping";
     }
     if (options.dryRun) return failure([{ code: "PLAN_NOT_FOUND", severity: "error", message: "Dry-run does not launch the interactive planner.", remediation: "Pass --plan <path> to validate a plan in dry-run mode." }]);
-    const planned = await dependencies.planner(git.data.root, config.data.documentation.plansDirectory, context.data, options.issue, dependencies.execute);
+    const planned = await dependencies.planner(git.data.root, config.data.documentation.plansDirectory, facts.data.issue, dependencies.execute);
     if (!planned.ok) return planned;
     planPath = planned.data;
   }

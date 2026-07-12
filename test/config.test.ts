@@ -14,8 +14,6 @@ github:
 repository:
   defaultBranch: main
 documentation:
-  projectFile: PROJECT.md
-  agentsFile: AGENTS.md
   plansDirectory: docs/plans/active
 planning:
   adapter: claude-glm

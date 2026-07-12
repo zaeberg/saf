@@ -16,8 +16,15 @@ describe("shape external adapters", () => {
       await writeFile(join(plans, "issue-42.md"), "# plan");
       return execution(invocation, 0);
     });
-    await expect(runPlanner(root, "docs/plans/active", join(root, "context.md"), 42, execute)).resolves.toMatchObject({ ok: true, data: join(plans, "issue-42.md") });
-    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ command: "claude", stdio: "inherit", args: [expect.stringContaining("/planning:make")] }));
+    await expect(runPlanner(root, "docs/plans/active", { number: 42, title: "Fix recovery", state: "open", body: "Expected outcome", comments: [] }, execute)).resolves.toMatchObject({ ok: true, data: join(plans, "issue-42.md") });
+    const prompt = execute.mock.calls[0]![0].args![0]!;
+    expect(prompt).toContain("GitHub Issue #42");
+    expect(prompt).toContain("Expected outcome");
+    expect(prompt).toContain("read AGENTS.md");
+    expect(prompt).toContain("/planning:make");
+    expect(prompt).not.toContain("PROJECT.md");
+    expect(prompt).not.toContain(".saf/config.yaml");
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ command: "claude", stdio: "inherit" }));
   });
 
   it("maps revdiff annotations from exit code 10", async () => {

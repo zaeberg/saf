@@ -17,6 +17,8 @@ describe("saf init integration", () => {
     const first = await initializeRepository(options, { execute, github: fakeGitHubProvider, confirm: async () => false, write });
     expect(first).toMatchObject({ ok: true, data: { changed: true, repository: "zbrg/saf", validationCommands: ["pnpm check"] } });
     const configAfterFirstRun = await readFile(join(root, ".saf/config.yaml"), "utf8");
+    expect(configAfterFirstRun).not.toContain("projectFile");
+    expect(configAfterFirstRun).not.toContain("agentsFile");
     const ignoreAfterFirstRun = await readFile(join(root, ".gitignore"), "utf8");
     const second = await initializeRepository(options, { execute, github: fakeGitHubProvider, confirm: async () => false, write });
     expect(second).toMatchObject({ ok: true, data: { changed: false } });
