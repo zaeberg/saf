@@ -15,6 +15,10 @@
 - Исправления после human review.
 - Merge или перевод PR в Ready.
 
+## Marker contract
+
+Run evidence использует общий marker v1 из SAF-003. Build-команда не формирует GitHub comment вручную: скрытый envelope создаётся `serializeMarker`, а видимая часть показывает state, branch, run ID и Pull Request, когда он известен. Обновление run state должно сохранять один канонический marker и не создавать конфликтующие comments.
+
 ## Tasks
 
 ### Task 1 — Build transition guard
@@ -26,6 +30,7 @@
 ### Task 2 — Run marker and locking
 
 - Определить versioned run marker и idempotency key.
+- Использовать общий marker serializer/parser и human-readable run summary.
 - Создать локальный process lock в `.saf/runtime/`.
 - Публиковать recoverable start/success/failure evidence.
 - Перевести Project item в `Running` после успешного preflight.
@@ -73,7 +78,7 @@ saf build 42 --dry-run
 ## Evidence required
 
 - Fake-executable integration tests Ralphex success/failure/cancel.
+- Integration fixture видимого run comment для состояний started/succeeded/failed.
 - Validation evidence fixture.
 - Tests повторного запуска на каждом partial state.
 - Manual live Draft PR smoke test.
-

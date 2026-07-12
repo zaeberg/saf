@@ -18,6 +18,8 @@
 
 Approved-plan marker v1 должен содержать Issue, revision, normalization version, SHA-256 и полный plan. До первого live использования зафиксировать normalization fixtures: LF, trailing whitespace и final newline.
 
+Marker публикуется только через общий `serializeMarker` и читается общим parser из SAF-003. Comment должен содержать скрытый canonical envelope и видимую human-readable часть с Issue, revision, SHA-256 и раскрываемым полным plan. Ручная сборка marker comment в shape-команде запрещена.
+
 ## Tasks
 
 ### Task 1 — Shape guard and context
@@ -48,6 +50,8 @@ Approved-plan marker v1 должен содержать Issue, revision, normali
 ### Task 5 — Publish and transition
 
 - Идемпотентно опубликовать marker comment.
+- Использовать общий marker serializer/parser без собственного comment format.
+- Проверить human-readable summary и раскрываемый plan в integration fixture.
 - Обнаруживать duplicate/conflicting revision.
 - Перевести Project item в `Ready` после успешной публикации.
 
@@ -71,6 +75,6 @@ saf shape 42 --plan fixtures/plans/valid.md --dry-run
 
 - Normalization/hash fixtures.
 - Marker round-trip tests.
+- Snapshot/shape test видимой части approved-plan comment.
 - Integration test успешного и прерванного shape.
 - Manual live smoke plan approval.
-

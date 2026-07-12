@@ -21,6 +21,8 @@
 - Severity mapping annotations: blocking/non-blocking.
 - Commit status context `saf/human-acceptance`.
 
+Human-acceptance evidence использует общий marker v1 из SAF-003. Review-команда не формирует comment вручную: `serializeMarker` создаёт скрытый canonical envelope и видимую часть с Issue, exact commit SHA и timestamp. Несколько acceptance markers для разных SHA являются историей; parser выбирает последнее evidence, а не считает их конфликтом.
+
 ## Tasks
 
 ### Task 1 — Review preflight
@@ -50,6 +52,7 @@
 
 - Опубликовать commit status для exact SHA.
 - Добавить versioned evidence comment в PR.
+- Использовать общий marker serializer/parser и проверить human-readable acceptance summary.
 - Не переводить Project item в `Done` до merge.
 
 ## Acceptance criteria
@@ -73,5 +76,5 @@ saf review 42 --dry-run
 
 - Integration tests всех blocking сценариев.
 - Проверка exact SHA в fake GitHub status request.
+- Integration fixture видимого acceptance comment и истории нескольких SHA.
 - Manual live review и acceptance smoke test.
-

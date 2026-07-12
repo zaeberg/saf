@@ -28,12 +28,15 @@
 - новый commit после acceptance;
 - неверный ручной Project Status;
 - conflicting marker comments;
+- marker comments с повреждённым hidden envelope при сохранённой visible части;
+- human-readable presentation approved-plan, run и human-acceptance markers;
 - временная недоступность GitHub API.
 
 ### Task 2 — Idempotency matrix
 
 - Повторить `init`, `status`, `shape`, `build`, `review` на каждом допустимом terminal/partial state.
 - Убедиться в отсутствии duplicate config entries, comments, branches, PR и statuses.
+- Подтвердить, что все marker comments созданы общим serializer, читаются общим parser и содержат понятный visible summary.
 
 ### Task 3 — Security and scope audit
 
@@ -62,6 +65,7 @@
 5. Хотя бы один interrupted run восстановлен.
 6. Владелец подтверждает приемлемый review cost.
 7. Follow-up backlog основан на наблюдаемом friction пилота.
+8. Marker comments одновременно обеспечивают canonical recovery и понятную человеку GitHub timeline.
 
 ## Validation
 
@@ -75,6 +79,6 @@ pnpm build
 ## Evidence required
 
 - Recovery/idempotency test matrix.
+- Marker presentation matrix для approved-plan, run lifecycle и acceptance history.
 - Sanitized pilot report.
 - Итоговое go/harden/stop решение.
-
