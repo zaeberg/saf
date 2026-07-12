@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { hashPlan, parseMarkers, serializeMarker, type AcceptanceMarker, type ApprovedPlanMarker } from "../src/status/markers.js";
+import { hashPlan, normalizePlan, parseMarkers, serializeMarker, type AcceptanceMarker, type ApprovedPlanMarker, type RunMarker } from "../src/status/markers.js";
 
 const plan = "# Plan\r\n\r\n```bash\r\npnpm test\r\n```\r\n\r\nTask 1   \r\n";
 const approved: ApprovedPlanMarker = { version: 1, kind: "approved-plan", issue: 42, revision: 1, normalizationVersion: 1, sha256: hashPlan(plan), plan };
 
 describe("SAF markers", () => {
   it("round-trips an approved plan and verifies its hash", () => {
-    const parsed = parseMarkers([{ id: 1, body: serializeMarker(approved) }], 42);
+    const body = serializeMarker(approved);
+    const parsed = parseMarkers([{ id: 1, body }], 42);
     expect(parsed.approvedPlan).toEqual(approved);
     expect(parsed.findings).toEqual([]);
+    expect(body).toContain("**SAF · Approved plan**");
+    expect(body).toContain("<summary>Full approved plan r1</summary>");
+    expect(body).toContain(normalizePlan(plan));
   });
 
   it("accepts identical duplicate markers", () => {
@@ -44,5 +48,18 @@ describe("SAF markers", () => {
     ], 42);
     expect(parsed.acceptance).toEqual(current);
     expect(parsed.findings).toEqual([]);
+  });
+
+  it("renders visible summaries for run and acceptance markers", () => {
+    const run: RunMarker = { version: 1, kind: "run", issue: 42, runId: "run-1", state: "started", branch: "feat/42", pullRequest: 51 };
+    const acceptance: AcceptanceMarker = { version: 1, kind: "human-acceptance", issue: 42, sha: "a".repeat(40), acceptedAt: "2026-07-12T01:00:00.000Z" };
+    const runBody = serializeMarker(run);
+    const acceptanceBody = serializeMarker(acceptance);
+    expect(runBody).toContain("**SAF · Build run**");
+    expect(runBody).toContain("- Branch: `feat/42`");
+    expect(runBody).toContain("- Pull Request: #51");
+    expect(acceptanceBody).toContain("**SAF · Human acceptance**");
+    expect(acceptanceBody).toContain(`- Commit: \`${acceptance.sha}\``);
+    expect(parseMarkers([{ id: 1, body: runBody }, { id: 2, body: acceptanceBody }], 42)).toMatchObject({ run, acceptance, findings: [] });
   });
 });

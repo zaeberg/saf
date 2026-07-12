@@ -95,8 +95,48 @@ export function hashPlan(plan: string): string {
 export function serializeMarker(marker: SafMarker): string {
   const payload = gzipSync(Buffer.from(JSON.stringify(marker), "utf8"), { level: 9 }).toString("base64url");
   const envelope = `<!-- saf:marker:v${marker.version}:${payload} -->`;
-  if (marker.kind !== "approved-plan") return envelope;
-  return `${envelope}\n\n<details>\n<summary>Approved plan r${marker.revision}</summary>\n\n${normalizePlan(marker.plan)}\n</details>`;
+  return `${envelope}\n\n${renderMarkerSummary(marker)}`;
+}
+
+function renderMarkerSummary(marker: SafMarker): string {
+  switch (marker.kind) {
+    case "approved-plan":
+      return [
+        "**SAF · Approved plan**",
+        "",
+        `- Issue: #${marker.issue}`,
+        `- Revision: r${marker.revision}`,
+        `- SHA-256: \`${marker.sha256}\``,
+        "",
+        "<details>",
+        `<summary>Full approved plan r${marker.revision}</summary>`,
+        "",
+        normalizePlan(marker.plan),
+        "</details>"
+      ].join("\n");
+    case "run":
+      return [
+        "**SAF · Build run**",
+        "",
+        `- Issue: #${marker.issue}`,
+        `- State: ${marker.state}`,
+        `- Branch: \`${safeInline(marker.branch)}\``,
+        `- Run: \`${safeInline(marker.runId)}\``,
+        ...(marker.pullRequest ? [`- Pull Request: #${marker.pullRequest}`] : [])
+      ].join("\n");
+    case "human-acceptance":
+      return [
+        "**SAF · Human acceptance**",
+        "",
+        `- Issue: #${marker.issue}`,
+        `- Commit: \`${marker.sha}\``,
+        `- Accepted at: ${marker.acceptedAt}`
+      ].join("\n");
+  }
+}
+
+function safeInline(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").replace(/`/g, "'");
 }
 
 function selectMarker<T extends SafMarker>(markers: T[], kind: string, findings: MarkerFinding[]): T | undefined {
