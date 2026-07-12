@@ -7,10 +7,10 @@ export interface PlanArtifact {
 }
 
 const requiredSections = [
-  { name: "Goal", pattern: /^(#{1,6})\s+(Goal|Цель)\s*$/im },
-  { name: "Tasks", pattern: /^(#{1,6})\s+(Tasks|Задачи)\s*$/im },
-  { name: "Acceptance criteria", pattern: /^(#{1,6})\s+(Acceptance criteria|Критерии при[её]мки)\s*$/im },
-  { name: "Validation", pattern: /^(#{1,6})\s+(Validation|Проверка)\s*$/im }
+  { name: "Overview", pattern: /^(#{1,6})\s+(Overview|Goal|Цель)\s*$/im },
+  { name: "Implementation Steps", pattern: /^(#{1,6})\s+(Implementation Steps|Tasks|Задачи)\s*$/im },
+  { name: "Solution Overview", pattern: /^(#{1,6})\s+(Solution Overview|Acceptance criteria|Критерии при[её]мки)\s*$/im },
+  { name: "Validation Commands", pattern: /^(#{1,6})\s+(Validation Commands|Validation|Проверка)\s*$/im }
 ] as const;
 
 export async function loadAndLintPlan(path: string): Promise<CommandResult<PlanArtifact>> {
