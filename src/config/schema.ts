@@ -29,7 +29,7 @@ export const configSchemaV1 = z.strictObject({
   review: z.strictObject({
     adapter: z.union([z.literal("ralphex-codex"), z.literal("revdiff")]).transform(() => "ralphex-codex" as const),
     model: z.string().min(1).optional(),
-    externalReviewTool: z.enum(["codex", "custom", "none"]).default("none")
+    externalReviewTool: z.enum(["codex", "claude"]).default("codex")
   }),
   validation: z.strictObject({
     commands: z.array(z.string().min(1)).min(1)

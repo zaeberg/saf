@@ -42,11 +42,11 @@ export async function reviewIssue(options: ReviewOptions, dependencies: ReviewDe
   if (!tools.ok) return tools;
   if (options.dryRun) return success({ issue: options.issue, state: "DryRun", pullRequest: pullRequest.number, branch: facts.data.run.branch, planPath });
   let externalReviewTool = options.externalReviewTool ?? config.data.review.externalReviewTool;
-  let reviewModel = options.reviewModel ?? ":xhigh";
+  let reviewModel: string | undefined = options.reviewModel ?? config.data.review.model ?? ":xhigh";
   if (options.interactive) {
     if (options.externalReviewTool === undefined) externalReviewTool = await dependencies.prompt.select("External review tool", [
-      { name: "None", value: "none" as const },
-      { name: "Codex", value: "codex" as const }
+      { name: "Codex", value: "codex" as const },
+      { name: "Claude", value: "claude" as const }
     ], externalReviewTool);
     if (options.reviewModel === undefined) reviewModel = normalizeModel(await dependencies.prompt.input("Review model (empty uses Ralphex default)", reviewModel));
   }

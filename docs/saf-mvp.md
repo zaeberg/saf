@@ -148,7 +148,7 @@ saf shape <issue> --plan <path>
 
 1. Найти связанный open Pull Request, run branch и original plan.
 2. Восстановить local/remote-only branch.
-3. Запустить `ralphex --review --codex`.
+3. Запустить `ralphex --review`; executor определяется review model, а SAF предлагает только `codex` или `claude` как пользовательский выбор review tool.
 4. Поддержать `--review-model` и `--external-review-tool`.
 5. Выполнить configured validation и push branch без force.
 6. Не публиковать human acceptance markers или commit statuses.
@@ -229,7 +229,7 @@ execution:
 
 review:
   adapter: ralphex-codex
-  externalReviewTool: none
+  externalReviewTool: codex
 
 validation:
   commands:
@@ -337,7 +337,7 @@ CLI commands
 Результат: `saf review <issue>` запускает отдельный Ralphex review, после чего human review и merge выполняются в GitHub.
 
 - original plan и run branch;
-- `ralphex --review --codex`;
+- `ralphex --review` с выбранными review model и tool;
 - configurable review model;
 - configurable external review tool;
 - GitHub UI как human review boundary.

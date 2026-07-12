@@ -46,8 +46,8 @@ describe("build execution", () => {
 
   it("runs the standalone Ralphex review pipeline", async () => {
     const execute = vi.fn(async (invocation: CommandInvocation) => ok(invocation));
-    await expect(runRalphexReview("/repo", "/repo/docs/plans/plan.md", { baseRef: "master", externalReviewTool: "none", reviewModel: "gpt-5.4:high" }, execute)).resolves.toMatchObject({ ok: true });
-    expect(execute).toHaveBeenCalledWith({ command: "ralphex", args: ["--review", "--codex", "--external-review-tool=none", "--base-ref=master", "--review-model=gpt-5.4:high", "/repo/docs/plans/plan.md"], cwd: "/repo", stdio: "inherit" });
+    await expect(runRalphexReview("/repo", "/repo/docs/plans/plan.md", { baseRef: "master", externalReviewTool: "claude", reviewModel: "gpt-5.4:high" }, execute)).resolves.toMatchObject({ ok: true });
+    expect(execute).toHaveBeenCalledWith({ command: "ralphex", args: ["--review", "--external-review-tool=none", "--base-ref=master", "--review-model=gpt-5.4:high", "/repo/docs/plans/plan.md"], cwd: "/repo", stdio: "inherit" });
   });
 });
 

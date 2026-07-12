@@ -51,7 +51,7 @@ describe("CLI shell", () => {
 
   it("rejects an unsupported Ralphex external review tool", async () => {
     let stderr = "";
-    const result = await runCli(["review", "42", "--external-review-tool", "other", "--json"], { stdout: () => undefined, stderr: (text) => { stderr += text; } });
+    const result = await runCli(["review", "42", "--external-review-tool", "none", "--json"], { stdout: () => undefined, stderr: (text) => { stderr += text; } });
     expect(result.exitCode).toBe(2);
     expect(JSON.parse(stderr)).toMatchObject({ ok: false, diagnostics: [{ code: "INVALID_ARGUMENT" }] });
   });

@@ -23,7 +23,7 @@ execution:
   tasksOnly: false
 review:
   adapter: ralphex-codex
-  externalReviewTool: none
+  externalReviewTool: codex
 validation:
   commands:
     - pnpm check
@@ -53,8 +53,13 @@ describe("loadConfig", () => {
   });
 
   it("migrates the legacy revdiff adapter to Ralphex review defaults", async () => {
-    const result = await loadConfig(await fixture(validConfig.replace("adapter: ralphex-codex\n  externalReviewTool: none", "adapter: revdiff")));
-    expect(result).toMatchObject({ ok: true, data: { review: { adapter: "ralphex-codex", externalReviewTool: "none" } } });
+    const result = await loadConfig(await fixture(validConfig.replace("adapter: ralphex-codex\n  externalReviewTool: codex", "adapter: revdiff")));
+    expect(result).toMatchObject({ ok: true, data: { review: { adapter: "ralphex-codex", externalReviewTool: "codex" } } });
+  });
+
+  it("rejects unsupported external review tools", async () => {
+    const result = await loadConfig(await fixture(validConfig.replace("externalReviewTool: codex", "externalReviewTool: none")));
+    expect(result).toMatchObject({ ok: false, diagnostics: [{ code: "CONFIG_INVALID", path: "review.externalReviewTool" }] });
   });
 });
 

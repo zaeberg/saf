@@ -4,7 +4,7 @@ import { runCommand, type CommandInvocation } from "../runner/command-runner.js"
 
 export interface ValidationEvidence { command: string; exitCode: number; completedAt: string; }
 export interface RalphexBuildOptions { tasksOnly: boolean; taskModel?: string; }
-export interface RalphexReviewOptions { reviewModel?: string; externalReviewTool: "codex" | "custom" | "none"; baseRef: string; }
+export interface RalphexReviewOptions { reviewModel?: string; externalReviewTool: "codex" | "claude"; baseRef: string; }
 export type BuildExecutor = (invocation: CommandInvocation) => ReturnType<typeof runCommand>;
 
 export async function checkBuildTools(root: string, execute: BuildExecutor = runCommand): Promise<CommandResult<void>> {
@@ -28,7 +28,8 @@ export async function runRalphex(root: string, planPath: string, branch: string,
 }
 
 export async function runRalphexReview(root: string, planPath: string, options: RalphexReviewOptions, execute: BuildExecutor = runCommand): Promise<CommandResult<void>> {
-  const args = ["--review", "--codex", `--external-review-tool=${options.externalReviewTool}`, `--base-ref=${options.baseRef}`, ...(options.reviewModel ? [`--review-model=${options.reviewModel}`] : []), planPath];
+  const externalReviewTool = options.externalReviewTool === "claude" ? "none" : "codex";
+  const args = ["--review", `--external-review-tool=${externalReviewTool}`, `--base-ref=${options.baseRef}`, ...(options.reviewModel ? [`--review-model=${options.reviewModel}`] : []), planPath];
   const result = await execute({ command: "ralphex", args, cwd: root, stdio: "inherit" });
   if (result.ok) return success(undefined);
   if (result.diagnostics.some((diagnostic) => diagnostic.code === "COMMAND_CANCELLED")) return result;

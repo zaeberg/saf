@@ -288,10 +288,12 @@ saf build 42 --tasks-only --task-model gpt-5.4:high
 ```bash
 saf review 42 --dry-run
 saf review 42
-saf review 42 --review-model gpt-5.4:high --external-review-tool none
+saf review 42 --review-model gpt-5.4:high --external-review-tool codex
 ```
 
-Команда вызывает `ralphex --review --codex` с оригинальным plan, выполняет configured validation и push-ит обновлённую branch без force. В интерактивном терминале SAF предлагает выбрать external review tool и review model, используя `review.externalReviewTool` и `review.model` как defaults. Пустая model оставляет выбор Ralphex. Флаги `--review-model <model[:effort]>` и `--external-review-tool <codex|custom|none>` переопределяют соответствующие значения и пропускают вопросы для них. В non-interactive режиме и при `--dry-run` вопросы не задаются.
+Команда вызывает `ralphex --review` с оригинальным plan, выполняет configured validation и push-ит обновлённую branch без force. В интерактивном терминале SAF предлагает выбрать external review tool (`codex` или `claude`) и review model, используя `review.externalReviewTool` и `review.model` как defaults. Пустая model оставляет выбор Ralphex. Флаги `--review-model <model[:effort]>` и `--external-review-tool <codex|claude>` переопределяют соответствующие значения и пропускают вопросы для них. В non-interactive режиме и при `--dry-run` вопросы не задаются.
+
+В Ralphex Claude является основным review executor, а не external tool. Поэтому SAF переводит выбор `claude` во внутренний вызов Ralphex с отключённым external review; значения Ralphex `custom` и `none` не входят в публичный интерфейс SAF.
 
 Human review, перевод Draft PR в Ready и merge выполняются в GitHub.
 
@@ -356,7 +358,7 @@ execution:
 review:
   adapter: ralphex-codex
   model: gpt-5.4:high
-  externalReviewTool: none
+  externalReviewTool: codex
 
 validation:
   commands:

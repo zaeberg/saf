@@ -175,5 +175,5 @@ function dependencies(root: string, adapter: GitHubAdapter, failValidation = fal
 
 function comment(id: number, body: string) { return { id, body, createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" }; }
 
-const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { plansDirectory: "docs/plans" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1, tasksOnly: false }, review: { adapter: "ralphex-codex", externalReviewTool: "none" }, validation: { commands: ["pnpm check"] } };
+const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { plansDirectory: "docs/plans" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1, tasksOnly: false }, review: { adapter: "ralphex-codex", externalReviewTool: "codex" }, validation: { commands: ["pnpm check"] } };
 const plan = "# Plan\n\n## Overview\n\nImplement build.\n\n## Implementation Steps\n\n- [ ] Implement.\n\n## Solution Overview\n\nComplete.\n\n## Validation Commands\n\n```bash\npnpm check\n```\n";

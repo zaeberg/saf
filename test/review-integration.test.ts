@@ -16,7 +16,7 @@ describe("saf review integration", () => {
     const ralphex = vi.fn(async () => success(undefined));
     const result = await reviewIssue({ issue: 42, dryRun: false, cwd: fixture.root, reviewModel: "gpt-5.4:high" }, dependencies(fixture, ralphex));
     expect(result).toMatchObject({ ok: true, data: { state: "Reviewed", pullRequest: 7, planPath: fixture.planPath } });
-    expect(ralphex).toHaveBeenCalledWith(fixture.root, fixture.planPath, { baseRef: "master", externalReviewTool: "none", reviewModel: "gpt-5.4:high" }, expect.any(Function));
+    expect(ralphex).toHaveBeenCalledWith(fixture.root, fixture.planPath, { baseRef: "master", externalReviewTool: "codex", reviewModel: "gpt-5.4:high" }, expect.any(Function));
   });
 
   it("does not run Ralphex during dry-run", async () => {
@@ -31,11 +31,11 @@ describe("saf review integration", () => {
     const fixture = await reviewFixture();
     const ralphex = vi.fn(async () => success(undefined));
     const harness = dependencies(fixture, ralphex);
-    harness.prompt.select.mockResolvedValueOnce("codex");
+    harness.prompt.select.mockResolvedValueOnce("claude");
     harness.prompt.input.mockResolvedValueOnce("gpt-5.4:medium");
     const result = await reviewIssue({ issue: 42, dryRun: false, interactive: true, cwd: fixture.root }, harness);
     expect(result.ok).toBe(true);
-    expect(ralphex).toHaveBeenCalledWith(fixture.root, fixture.planPath, { baseRef: "master", externalReviewTool: "codex", reviewModel: "gpt-5.4:medium" }, expect.any(Function));
+    expect(ralphex).toHaveBeenCalledWith(fixture.root, fixture.planPath, { baseRef: "master", externalReviewTool: "claude", reviewModel: "gpt-5.4:medium" }, expect.any(Function));
   });
 });
 
@@ -66,5 +66,5 @@ function dependencies(fixture: Awaited<ReturnType<typeof reviewFixture>>, ralphe
 
 function executor(root: string) { return async (invocation: CommandInvocation) => { const args = invocation.args ?? []; let stdout = ""; if (args[0] === "rev-parse") stdout = root; else if (args[0] === "remote") stdout = "git@github.com:zbrg/saf.git"; else if (args[0] === "branch" && args[1] === "--show-current") stdout = "saf/42"; else if (args.includes("--format=%(refname:short)")) stdout = "master\nsaf/42"; return success<CommandExecution>({ command: invocation.command, args, exitCode: 0, stdout, stderr: "", dryRun: false }); }; }
 function comment(id: number, body: string) { return { id, body, createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" }; }
-const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { plansDirectory: "docs/plans" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1, tasksOnly: false }, review: { adapter: "ralphex-codex", externalReviewTool: "none" }, validation: { commands: ["pnpm check"] } };
+const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { plansDirectory: "docs/plans" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1, tasksOnly: false }, review: { adapter: "ralphex-codex", externalReviewTool: "codex" }, validation: { commands: ["pnpm check"] } };
 const plan = "# Plan\n\n## Overview\n\nReview.\n\n## Implementation Steps\n\n- [ ] Review changes.\n\n## Solution Overview\n\nSafe.\n\n## Validation Commands\n\n```bash\npnpm check\n```\n";

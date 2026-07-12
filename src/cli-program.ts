@@ -100,11 +100,11 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
     .description("run the Ralphex automated review pipeline")
     .argument("<issue>", "positive GitHub Issue number")
     .option("--review-model <model>", "Ralphex review model as model[:effort]")
-    .option("--external-review-tool <tool>", "external review tool: codex, custom or none")
+    .option("--external-review-tool <tool>", "external review tool: codex or claude")
     .action(async (issueValue: string, options: { reviewModel?: string; externalReviewTool?: string }, command: Command) => {
       const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
       const tool = options.externalReviewTool;
-      const validTool = tool === undefined || tool === "codex" || tool === "custom" || tool === "none";
+      const validTool = tool === undefined || tool === "codex" || tool === "claude";
       const result = validTool
         ? await reviewIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, interactive: io.interactive === true, ...(options.reviewModel ? { reviewModel: options.reviewModel } : {}), ...(tool ? { externalReviewTool: tool } : {}), cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphexReview, validation: runValidation, prompt: promptFromIo(io) })
         : failureReviewTool(tool);
@@ -135,7 +135,7 @@ function promptFromIo(io: CliIo): Pick<PromptAdapter, "input" | "select"> {
 }
 
 function failureReviewTool(tool: string) {
-  return { ok: false as const, diagnostics: [{ code: "INVALID_ARGUMENT" as const, severity: "error" as const, message: `Invalid external review tool: ${tool}`, remediation: "Use codex, custom or none." }] };
+  return { ok: false as const, diagnostics: [{ code: "INVALID_ARGUMENT" as const, severity: "error" as const, message: `Invalid external review tool: ${tool}`, remediation: "Use codex or claude." }] };
 }
 
 function collect(value: string, previous: string[]): string[] {
