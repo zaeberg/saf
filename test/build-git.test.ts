@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { success } from "../src/contracts/result.js";
-import { ensureRunBranch } from "../src/build/git.js";
+import { branchForPlan, ensureRunBranch } from "../src/build/git.js";
 import type { CommandExecution, CommandInvocation } from "../src/runner/command-runner.js";
 
 describe("build branch recovery", () => {
+  it("derives a readable branch from the plan filename", () => {
+    expect(branchForPlan("docs/plans/20260713-issue-pr-templates.md", 42)).toBe("issue-pr-templates/42");
+    expect(branchForPlan("docs/plans/20260713-API cleanup.plan.md", 7)).toBe("api-cleanup-plan/7");
+  });
   it("switches to an existing local run branch", async () => {
     const execute = executor("master");
     await expect(ensureRunBranch("/repo", "saf/42", ["master", "saf/42"], [], execute)).resolves.toMatchObject({ ok: true });

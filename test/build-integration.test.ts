@@ -25,7 +25,7 @@ describe("saf build integration", () => {
     expect(github.prInputs[0]?.body).toContain("pnpm check");
     expect(github.projectAdds).toEqual(["PR_node"]);
     expect(harness.ralphex).toHaveBeenCalledOnce();
-    expect(harness.ralphex).toHaveBeenCalledWith(fixture.root, join(fixture.root, "docs/plans/42.md"), fixture.branch, { tasksOnly: false }, expect.any(Function));
+    expect(harness.ralphex).toHaveBeenCalledWith(fixture.root, fixture.planPath, fixture.branch, { tasksOnly: false }, expect.any(Function));
     expect(harness.pushes()).toEqual([["push", "--set-upstream", "origin", fixture.branch]]);
     expect(parseMarkers(github.issue.comments, 42).run).toMatchObject({ state: "succeeded", pullRequest: 7, branch: fixture.branch });
     expect(github.issue.comments.at(-1)?.body).toContain("**SAF · Build run**");
@@ -70,7 +70,7 @@ describe("saf build integration", () => {
     harness.prompt.input.mockResolvedValueOnce("gpt-5.4:high");
     const result = await buildIssue({ issue: 42, dryRun: false, interactive: true, cwd: fixture.root }, harness.dependencies);
     expect(result.ok).toBe(true);
-    expect(harness.ralphex).toHaveBeenCalledWith(fixture.root, join(fixture.root, "docs/plans/42.md"), fixture.branch, { tasksOnly: true, taskModel: "gpt-5.4:high" }, expect.any(Function));
+    expect(harness.ralphex).toHaveBeenCalledWith(fixture.root, fixture.planPath, fixture.branch, { tasksOnly: true, taskModel: "gpt-5.4:high" }, expect.any(Function));
   });
 
   it("recovers after execution without running Ralphex twice", async () => {
@@ -93,7 +93,7 @@ describe("saf build integration", () => {
     const interrupted = await buildIssue({ issue: 42, dryRun: false, cwd: fixture.root }, harness.dependencies);
     expect(interrupted).toMatchObject({ ok: false, diagnostics: [{ code: "COMMAND_CANCELLED" }] });
     expect(parseMarkers(github.issue.comments, 42).run).toMatchObject({ state: "failed", failurePhase: "execution" });
-    await writeFile(join(fixture.root, "docs/plans/42.md"), plan.replace("- [ ] Implement.", "- [x] Implement."));
+    await writeFile(fixture.planPath, plan.replace("- [ ] Implement.", "- [x] Implement."));
     const recovered = await buildIssue({ issue: 42, dryRun: false, cwd: fixture.root }, harness.dependencies);
     expect(recovered).toMatchObject({ ok: true, data: { state: "Review", pullRequest: 7 } });
     expect(harness.ralphex).toHaveBeenCalledTimes(2);
@@ -107,10 +107,11 @@ async function buildFixture() {
   await mkdir(join(root, ".saf"));
   await mkdir(join(root, "docs/plans"), { recursive: true });
   await writeFile(join(root, ".saf/config.yaml"), stringify(config));
-  await writeFile(join(root, "docs/plans/42.md"), plan);
+  const planPath = join(root, "docs/plans/20260713-issue-pr-templates.md");
+  await writeFile(planPath, plan);
   const sha = hashPlan(plan);
-  const approvedComment = serializeMarker({ version: 1, kind: "approved-plan", issue: 42, revision: 1, normalizationVersion: 1, sha256: sha, plan, planPath: "docs/plans/42.md" });
-  return { root, sha, approvedComment, runId: `42-${sha.slice(0, 12)}`, branch: `saf/42-${sha.slice(0, 12)}` };
+  const approvedComment = serializeMarker({ version: 1, kind: "approved-plan", issue: 42, revision: 1, normalizationVersion: 1, sha256: sha, plan, planPath: "docs/plans/20260713-issue-pr-templates.md" });
+  return { root, planPath, sha, approvedComment, runId: `42-${sha.slice(0, 12)}`, branch: "issue-pr-templates/42" };
 }
 
 function statefulAdapter(approved: string, run?: string, initialStatus = "Ready") {
@@ -155,7 +156,7 @@ function dependencies(root: string, adapter: GitHubAdapter, failValidation = fal
     else if (invocation.command === "ralphex" || invocation.command === "codex") stdout = "1.0.0";
     return success<CommandExecution>({ command: invocation.command, args, exitCode: 0, stdout, stderr: "", dryRun: false });
   };
-  const ralphex = vi.fn(async () => { branch = `saf/42-${hashPlan(plan).slice(0, 12)}`; return success(undefined); });
+  const ralphex = vi.fn(async () => { branch = "issue-pr-templates/42"; return success(undefined); });
   const validation = vi.fn(async () => failValidation
     ? failure<ValidationEvidence[]>([{ code: "VALIDATION_FAILED", severity: "error", message: "tests failed", remediation: "fix" }])
     : success([{ command: "pnpm check", exitCode: 0, completedAt: "2026-07-12T00:00:00Z" }]));

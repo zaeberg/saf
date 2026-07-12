@@ -11,7 +11,7 @@ import { readWorkflowFacts } from "../status/reader.js";
 import { deriveState } from "../status/reducer.js";
 import { checkBuildTools, runRalphex, runValidation, type ValidationEvidence } from "./execution.js";
 import { loadAndLintPlan } from "../shape/plan.js";
-import { checkWorkspace, ensureRunBranch, gitValue, pushBranch } from "./git.js";
+import { branchForPlan, checkWorkspace, ensureRunBranch, gitValue, pushBranch } from "./git.js";
 import { acquireRunLock } from "./lock.js";
 import type { PromptAdapter } from "../prompt/prompt-adapter.js";
 
@@ -54,7 +54,7 @@ export async function buildIssue(options: BuildOptions, dependencies: BuildDepen
     if (!workspace.ok) return workspace;
   }
   const runId = facts.data.run?.runId ?? `${options.issue}-${plan.sha256.slice(0, 12)}`;
-  const branch = facts.data.run?.branch ?? `saf/${options.issue}-${plan.sha256.slice(0, 12)}`;
+  const branch = facts.data.run?.branch ?? branchForPlan(plan.planPath, options.issue);
   if (options.dryRun) return success({ issue: options.issue, state: "DryRun", runId, branch, pullRequest: facts.data.pullRequest?.number ?? null, validation: [] });
   const willExecute = !facts.data.run || facts.data.run.state === "started" || facts.data.run.failurePhase === "execution";
   let tasksOnly = options.tasksOnly ?? config.data.execution.tasksOnly;

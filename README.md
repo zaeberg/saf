@@ -275,6 +275,8 @@ saf build 42 --tasks-only --task-model gpt-5.4:high
 7. создаёт или обновляет один Draft Pull Request;
 8. переводит item в `Review` либо в `Blocked` при ошибке.
 
+Для нового run branch называется по plan-файлу без даты и расширения: `docs/plans/20260713-issue-pr-templates.md` создаёт `issue-pr-templates/<issue>`. Повторный запуск использует branch, уже сохранённую в run marker.
+
 В интерактивном терминале SAF перед запуском предлагает выбрать режим `Full` или `Tasks only` и task model. Значения из `execution.tasksOnly` и `execution.taskModel` уже выбраны как defaults; пустая model оставляет выбор Ralphex. Флаги `--tasks-only` и `--task-model <model[:effort]>` переопределяют соответствующие значения и пропускают вопросы для них. В non-interactive режиме и при `--dry-run` вопросы не задаются.
 
 Повторный запуск обновляет тот же run marker, продолжает оригинальный plan и после успеха меняет `failed/Blocked` на `succeeded/Review`.

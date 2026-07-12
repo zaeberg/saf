@@ -1,7 +1,20 @@
+import { basename, extname } from "node:path";
 import { failure, success, type CommandResult } from "../contracts/result.js";
 import { runCommand, type CommandInvocation } from "../runner/command-runner.js";
 
 type GitExecutor = (invocation: CommandInvocation) => ReturnType<typeof runCommand>;
+
+export function branchForPlan(planPath: string, issue: number): string {
+  const filename = basename(planPath, extname(planPath));
+  const withoutDate = filename.replace(/^\d{8}-(?=.)/, "");
+  const slug = withoutDate
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}_-]+/gu, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "") || "plan";
+  return `${slug}/${issue}`;
+}
 
 export async function checkWorkspace(root: string, allowedPath: string | undefined, execute: GitExecutor = runCommand): Promise<CommandResult<void>> {
   const status = await execute({ command: "git", args: ["status", "--porcelain", "--untracked-files=all"], cwd: root });
