@@ -1,6 +1,6 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadAndLintPlan } from "../src/shape/plan.js";
 
@@ -10,10 +10,14 @@ describe("plan lint", () => {
     await expect(loadAndLintPlan(path)).resolves.toMatchObject({ ok: true, data: { path } });
   });
 
+  it("accepts a typical cc-thingz plan with nested task headings", async () => {
+    await expect(loadAndLintPlan(resolve("test/fixtures/cc-thingz-plan.md"))).resolves.toMatchObject({ ok: true });
+  });
+
   it.each([
     ["missing Validation", validPlan.replace("## Validation", "## Notes")],
     ["empty Tasks", validPlan.replace("- Implement the required behavior.", "No tasks yet.")],
-    ["placeholder", validPlan.replace("focused outcome", "TODO")]
+    ["missing implementation steps", validPlan.replace("## Tasks", "## Notes")]
   ])("rejects %s", async (_name, content) => {
     const result = await loadAndLintPlan(await fixture(content));
     expect(result).toMatchObject({ ok: false, diagnostics: [{ code: "PLAN_INVALID" }] });
