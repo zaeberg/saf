@@ -20,4 +20,11 @@ describe("CLI shell", () => {
     expect(result.exitCode).toBe(2);
     expect(JSON.parse(stderr)).toMatchObject({ ok: false, diagnostics: [{ code: "INVALID_ARGUMENT" }] });
   });
+
+  it("rejects invalid status Issue numbers before external reads", async () => {
+    let stderr = "";
+    const result = await runCli(["status", "nope", "--json"], { stdout: () => undefined, stderr: (text) => { stderr += text; } });
+    expect(result.exitCode).toBe(2);
+    expect(JSON.parse(stderr)).toMatchObject({ ok: false, diagnostics: [{ code: "INVALID_ARGUMENT" }] });
+  });
 });

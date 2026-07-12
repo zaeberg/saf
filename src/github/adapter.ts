@@ -2,7 +2,7 @@ import { z } from "zod";
 import { failure, success, type CommandResult } from "../contracts/result.js";
 import type { ProjectReference } from "../init/project-reference.js";
 import type { GitHubTransport } from "./transport.js";
-import { requiredProjectStatuses, type GitHubAdapter, type ProjectDetails, type RepositoryDetails } from "./types.js";
+import { requiredProjectStatuses, type CheckDetails, type CommitStatusDetails, type GitHubAdapter, type IssueDetails, type ProjectDetails, type ProjectItemDetails, type PullRequestDetails, type RepositoryDetails } from "./types.js";
 
 const repositorySchema = z.object({
   full_name: z.string(),
@@ -19,6 +19,16 @@ const projectSchema = z.object({
     }).nullable()
   }).nullable()
 });
+const issueSchema = z.object({ number: z.number().int().positive(), title: z.string(), state: z.enum(["open", "closed"]), body: z.string().nullable(), pull_request: z.unknown().optional() });
+const commentSchema = z.object({ id: z.number(), body: z.string().nullable(), created_at: z.string(), updated_at: z.string() });
+const projectItemSchema = z.object({ owner: z.object({ projectV2: z.object({ items: z.object({ nodes: z.array(z.object({
+  id: z.string(),
+  content: z.object({ number: z.number(), repository: z.object({ nameWithOwner: z.string() }) }).optional().nullable(),
+  fieldValueByName: z.object({ name: z.string() }).optional().nullable()
+}).passthrough()) }) }).nullable() }).nullable() });
+const pullRequestSchema = z.object({ number: z.number(), state: z.enum(["open", "closed"]), draft: z.boolean(), merged_at: z.string().nullable(), html_url: z.string(), head: z.object({ sha: z.string(), ref: z.string() }) });
+const checksSchema = z.object({ total_count: z.number(), check_runs: z.array(z.object({ name: z.string(), status: z.string(), conclusion: z.string().nullable() })) });
+const statusSchema = z.object({ sha: z.string(), context: z.string(), state: z.string() });
 
 export class DefaultGitHubAdapter implements GitHubAdapter {
   readonly #transport: GitHubTransport;
@@ -58,6 +68,91 @@ export class DefaultGitHubAdapter implements GitHubAdapter {
       return success({ id: project.id, title: project.title, statusOptions: status.options });
     } catch (error: unknown) {
       return githubFailure(error, `Project ${reference.owner}/${reference.number}`);
+    }
+  }
+
+  async getIssue(repository: string, issue: number): Promise<CommandResult<IssueDetails>> {
+    const parts = splitRepository(repository);
+    if (!parts.ok) return parts;
+    try {
+      const [issueResponse, commentsResponse] = await Promise.all([
+        this.#transport.getIssue(parts.data.owner, parts.data.repository, issue),
+        this.#transport.getIssueComments(parts.data.owner, parts.data.repository, issue)
+      ]);
+      const parsedIssue = issueSchema.safeParse(issueResponse);
+      const parsedComments = z.array(commentSchema).safeParse(commentsResponse);
+      if (!parsedIssue.success || !parsedComments.success) return invalidResponse("Issue");
+      if (parsedIssue.data.pull_request !== undefined) return failure([{ code: "GITHUB_NOT_FOUND", severity: "error", message: `#${issue} is a Pull Request, not an Issue.`, remediation: "Pass the GitHub Issue number linked to the workflow." }]);
+      return success({
+        number: parsedIssue.data.number,
+        title: parsedIssue.data.title,
+        state: parsedIssue.data.state,
+        body: parsedIssue.data.body ?? "",
+        comments: parsedComments.data.map((comment) => ({ id: comment.id, body: comment.body ?? "", createdAt: comment.created_at, updatedAt: comment.updated_at }))
+      });
+    } catch (error: unknown) {
+      return githubFailure(error, `Issue ${repository}#${issue}`);
+    }
+  }
+
+  async getProjectItem(reference: ProjectReference, repository: string, issue: number): Promise<CommandResult<ProjectItemDetails>> {
+    try {
+      const parsed = projectItemSchema.safeParse(await this.#transport.getProjectItem(reference.owner, reference.number, repository, issue));
+      if (!parsed.success) return invalidResponse("Project item");
+      const nodes = parsed.data.owner?.projectV2?.items.nodes ?? [];
+      const foreignRepositories = [...new Set(nodes.flatMap((node) => node.content?.repository.nameWithOwner.toLowerCase() ?? []))].filter((slug) => slug !== repository.toLowerCase());
+      if (foreignRepositories.length > 0) return failure([{ code: "PROJECT_REPOSITORY_DRIFT", severity: "error", message: `Project contains items from other repositories: ${foreignRepositories.join(", ")}.`, remediation: "Remove foreign repository items from the configured Project." }]);
+      const matches = nodes.filter((node) => node.content?.number === issue && node.content.repository.nameWithOwner.toLowerCase() === repository.toLowerCase());
+      if (matches.length === 0) return failure([{ code: "GITHUB_NOT_FOUND", severity: "error", message: `Issue #${issue} is not in Project ${reference.owner}/${reference.number}.`, remediation: "Add the Issue to the configured Project." }]);
+      if (matches.length > 1) return failure([{ code: "PROJECT_REPOSITORY_DRIFT", severity: "error", message: `Issue #${issue} has duplicate Project items.`, remediation: "Remove duplicate Project items before continuing." }]);
+      return success({ id: matches[0]!.id, status: matches[0]!.fieldValueByName?.name ?? null });
+    } catch (error: unknown) {
+      return githubFailure(error, `Project item for Issue #${issue}`);
+    }
+  }
+
+  async getPullRequest(repository: string, pullRequest: number): Promise<CommandResult<PullRequestDetails>> {
+    const parts = splitRepository(repository);
+    if (!parts.ok) return parts;
+    try {
+      const [pullRequestResponse, commentsResponse] = await Promise.all([
+        this.#transport.getPullRequest(parts.data.owner, parts.data.repository, pullRequest),
+        this.#transport.getIssueComments(parts.data.owner, parts.data.repository, pullRequest)
+      ]);
+      const parsed = pullRequestSchema.safeParse(pullRequestResponse);
+      const comments = z.array(commentSchema).safeParse(commentsResponse);
+      if (!parsed.success || !comments.success) return invalidResponse("Pull Request");
+      return success({ number: parsed.data.number, state: parsed.data.state, draft: parsed.data.draft, merged: parsed.data.merged_at !== null, headSha: parsed.data.head.sha, branch: parsed.data.head.ref, url: parsed.data.html_url, comments: comments.data.map((comment) => ({ id: comment.id, body: comment.body ?? "", createdAt: comment.created_at, updatedAt: comment.updated_at })) });
+    } catch (error: unknown) {
+      return githubFailure(error, `Pull Request ${repository}#${pullRequest}`);
+    }
+  }
+
+  async getChecks(repository: string, sha: string): Promise<CommandResult<CheckDetails>> {
+    const parts = splitRepository(repository);
+    if (!parts.ok) return parts;
+    try {
+      const parsed = checksSchema.safeParse(await this.#transport.getChecks(parts.data.owner, parts.data.repository, sha));
+      if (!parsed.success) return invalidResponse("checks");
+      if (parsed.data.total_count === 0) return success({ state: "missing", total: 0, failing: [] });
+      const failing = parsed.data.check_runs.filter((check) => check.status === "completed" && !["success", "neutral", "skipped"].includes(check.conclusion ?? "")).map((check) => check.name);
+      const pending = parsed.data.check_runs.some((check) => check.status !== "completed");
+      return success({ state: failing.length > 0 ? "failure" : pending ? "pending" : "success", total: parsed.data.total_count, failing });
+    } catch (error: unknown) {
+      return githubFailure(error, `checks for ${sha}`);
+    }
+  }
+
+  async getCommitStatus(repository: string, sha: string, context: string): Promise<CommandResult<CommitStatusDetails>> {
+    const parts = splitRepository(repository);
+    if (!parts.ok) return parts;
+    try {
+      const parsed = z.array(statusSchema).safeParse(await this.#transport.getCommitStatuses(parts.data.owner, parts.data.repository, sha));
+      if (!parsed.success) return invalidResponse("commit statuses");
+      const latest = parsed.data.find((status) => status.sha === sha && status.context === context);
+      return success({ present: latest?.state === "success", sha });
+    } catch (error: unknown) {
+      return githubFailure(error, `commit statuses for ${sha}`);
     }
   }
 }

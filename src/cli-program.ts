@@ -5,6 +5,8 @@ import { writeInitialization } from "./init/filesystem.js";
 import { createAuthenticatedGitHubAdapter } from "./github/auth.js";
 import { renderResult } from "./output.js";
 import { runCommand } from "./runner/command-runner.js";
+import { renderHumanStatus } from "./status/report.js";
+import { getStatus } from "./status/status.js";
 
 export interface CliIo {
   stdout: (text: string) => void;
@@ -46,6 +48,17 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
       const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
       const result = await initializeRepository({ project: options.project, validationCommands: options.validation, rebind: options.rebind, dryRun: globals.dryRun === true, yes: options.yes, interactive: io.interactive === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, confirm: io.confirm ?? (async () => false), write: writeInitialization });
       const rendered = renderResult(result, globals.json === true ? "json" : "human");
+      if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
+      commandExitCode = exitCodeFor(result.diagnostics);
+    });
+
+  program.command("status")
+    .description("derive workflow state for one GitHub Issue")
+    .argument("<issue>", "positive GitHub Issue number")
+    .action(async (issueValue: string, _options: unknown, command: Command) => {
+      const globals = command.optsWithGlobals<{ json?: boolean }>();
+      const result = await getStatus(Number(issueValue), io.cwd ?? process.cwd(), { execute: runCommand, github: createAuthenticatedGitHubAdapter });
+      const rendered = globals.json === true ? renderResult(result, "json") : renderHumanStatus(result);
       if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
       commandExitCode = exitCodeFor(result.diagnostics);
     });

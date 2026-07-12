@@ -52,5 +52,10 @@ exit 1
 
 const fakeAdapter: GitHubAdapter = {
   getRepository: async () => ({ ok: true, data: { repository: "zbrg/saf", defaultBranch: "master" }, diagnostics: [] }),
-  getProject: async () => ({ ok: true, data: { id: "PVT_1", title: "SAF", statusOptions: [] }, diagnostics: [] })
+  getProject: async () => ({ ok: true, data: { id: "PVT_1", title: "SAF", statusOptions: [] }, diagnostics: [] }),
+  getIssue: async () => ({ ok: true, data: { number: 1, title: "Issue", state: "open", body: "", comments: [] }, diagnostics: [] }),
+  getProjectItem: async () => ({ ok: true, data: { id: "item", status: "Backlog" }, diagnostics: [] }),
+  getPullRequest: async () => ({ ok: true, data: { number: 1, state: "open", draft: true, merged: false, headSha: "a", branch: "branch", url: "url", comments: [] }, diagnostics: [] }),
+  getChecks: async () => ({ ok: true, data: { state: "missing", total: 0, failing: [] }, diagnostics: [] }),
+  getCommitStatus: async () => ({ ok: true, data: { present: false, sha: "a" }, diagnostics: [] })
 };

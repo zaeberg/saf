@@ -6,7 +6,12 @@ import type { CommandExecution, CommandInvocation } from "../src/runner/command-
 
 const fakeAdapter: GitHubAdapter = {
   getRepository: async () => failure([]),
-  getProject: async () => failure([])
+  getProject: async () => failure([]),
+  getIssue: async () => failure([]),
+  getProjectItem: async () => failure([]),
+  getPullRequest: async () => failure([]),
+  getChecks: async () => failure([]),
+  getCommitStatus: async () => failure([])
 };
 
 describe("GitHub credential boundary", () => {

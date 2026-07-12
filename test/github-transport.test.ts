@@ -5,7 +5,7 @@ import { OctokitTransport } from "../src/github/transport.js";
 describe("OctokitTransport", () => {
   it("uses REST for repository facts", async () => {
     const get = vi.fn(async () => ({ data: { full_name: "zbrg/saf" } }));
-    const client = { rest: { repos: { get } }, graphql: Object.assign(vi.fn(), { paginate: vi.fn() }) } as unknown as Pick<Octokit, "rest" | "graphql">;
+    const client = { rest: { repos: { get } }, graphql: Object.assign(vi.fn(), { paginate: vi.fn() }), paginate: vi.fn() } as unknown as Pick<Octokit, "rest" | "graphql" | "paginate">;
     const transport = new OctokitTransport(client);
     await expect(transport.getRepository("zbrg", "saf")).resolves.toEqual({ full_name: "zbrg/saf" });
     expect(get).toHaveBeenCalledWith({ owner: "zbrg", repo: "saf" });
@@ -18,7 +18,7 @@ describe("OctokitTransport", () => {
       void variables;
       return paginated;
     });
-    const client = { rest: {}, graphql: Object.assign(vi.fn(), { paginate }) } as unknown as Pick<Octokit, "rest" | "graphql">;
+    const client = { rest: {}, graphql: Object.assign(vi.fn(), { paginate }), paginate: vi.fn() } as unknown as Pick<Octokit, "rest" | "graphql" | "paginate">;
     const transport = new OctokitTransport(client);
     await expect(transport.getProject("zbrg", 5)).resolves.toBe(paginated);
     expect(paginate).toHaveBeenCalledWith(expect.stringContaining("items(first:100,after:$cursor)"), { owner: "zbrg", number: 5 });

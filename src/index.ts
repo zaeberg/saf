@@ -12,3 +12,8 @@ export * from "./init/init.js";
 export * from "./init/project-reference.js";
 export * from "./prompt/prompt-adapter.js";
 export * from "./github/types.js";
+export * from "./status/facts.js";
+export * from "./status/markers.js";
+export * from "./status/reducer.js";
+export * from "./status/report.js";
+export * from "./status/status.js";

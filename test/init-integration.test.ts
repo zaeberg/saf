@@ -75,6 +75,11 @@ function fakeExecutor(root: string) {
 async function fakeGitHubProvider() {
   return success<GitHubAdapter>({
     getRepository: async () => success({ repository: "zbrg/saf", defaultBranch: "master" }),
-    getProject: async () => success({ id: "PVT_1", title: "SAF", statusOptions: [] })
+    getProject: async () => success({ id: "PVT_1", title: "SAF", statusOptions: [] }),
+    getIssue: async () => success({ number: 1, title: "Issue", state: "open", body: "", comments: [] }),
+    getProjectItem: async () => success({ id: "item", status: "Backlog" }),
+    getPullRequest: async () => success({ number: 1, state: "open", draft: true, merged: false, headSha: "a", branch: "branch", url: "url", comments: [] }),
+    getChecks: async () => success({ state: "missing", total: 0, failing: [] }),
+    getCommitStatus: async () => success({ present: false, sha: "a" })
   });
 }
