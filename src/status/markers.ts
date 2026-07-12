@@ -28,19 +28,11 @@ const runSchema = z.object({
   failurePhase: z.string().min(1).optional(),
   completedAt: z.string().datetime().optional()
 });
-const acceptanceSchema = z.object({
-  version: z.literal(1),
-  kind: z.literal("human-acceptance"),
-  issue: z.number().int().positive(),
-  sha: z.string().regex(/^[a-f0-9]{40,64}$/),
-  acceptedAt: z.string().datetime()
-});
-const markerSchema = z.discriminatedUnion("kind", [approvedPlanSchema, runSchema, acceptanceSchema]);
+const markerSchema = z.discriminatedUnion("kind", [approvedPlanSchema, runSchema]);
 
 export type SafMarker = z.infer<typeof markerSchema>;
 export type ApprovedPlanMarker = z.infer<typeof approvedPlanSchema>;
 export type RunMarker = z.infer<typeof runSchema>;
-export type AcceptanceMarker = z.infer<typeof acceptanceSchema>;
 
 export interface MarkerFinding {
   code: "MARKER_UNKNOWN_VERSION" | "MARKER_INVALID" | "MARKER_CONFLICT" | "PLAN_HASH_MISMATCH";
@@ -54,8 +46,6 @@ export interface ParsedMarkers {
   run?: RunMarker;
   runCommentId?: number;
   runCommentIds?: number[];
-  acceptance?: AcceptanceMarker;
-  acceptanceCommentId?: number;
   findings: MarkerFinding[];
 }
 
@@ -87,11 +77,6 @@ export function parseMarkers(comments: Array<{ id: number; body: string; updated
   const runEntries = markers.filter((entry): entry is typeof entry & { marker: RunMarker } => entry.marker.kind === "run");
   const approvedPlan = selectMarker(approvedEntries.map((entry) => entry.marker), "approved-plan", findings);
   const run = selectMarker(runEntries.map((entry) => entry.marker), "run", findings);
-  const acceptanceEntry = markers
-    .filter((entry): entry is typeof entry & { marker: AcceptanceMarker } => entry.marker.kind === "human-acceptance")
-    .sort((left, right) => (left.updatedAt ?? "").localeCompare(right.updatedAt ?? "") || left.commentId - right.commentId)
-    .at(-1);
-  const acceptance = acceptanceEntry?.marker;
   if (approvedPlan && hashPlan(approvedPlan.plan) !== approvedPlan.sha256) findings.push({ code: "PLAN_HASH_MISMATCH", message: `Approved plan revision ${approvedPlan.revision} does not match its SHA-256.` });
   return {
     ...(approvedPlan ? {
@@ -104,7 +89,6 @@ export function parseMarkers(comments: Array<{ id: number; body: string; updated
       runCommentId: runEntries.find((entry) => JSON.stringify(entry.marker) === JSON.stringify(run))!.commentId,
       runCommentIds: runEntries.filter((entry) => JSON.stringify(entry.marker) === JSON.stringify(run)).map((entry) => entry.commentId)
     } : {}),
-    ...(acceptance && acceptanceEntry ? { acceptance, acceptanceCommentId: acceptanceEntry.commentId } : {}),
     findings
   };
 }
@@ -151,14 +135,6 @@ function renderMarkerSummary(marker: SafMarker): string {
         ...(marker.pullRequest ? [`- Pull Request: #${marker.pullRequest}`] : []),
         ...(marker.planRevision ? [`- Plan: r${marker.planRevision}${marker.planSha256 ? ` (\`${marker.planSha256}\`)` : ""}`] : []),
         ...(marker.failurePhase ? [`- Failed phase: ${safeInline(marker.failurePhase)}`] : [])
-      ].join("\n");
-    case "human-acceptance":
-      return [
-        "**SAF · Human acceptance**",
-        "",
-        `- Issue: #${marker.issue}`,
-        `- Commit: \`${marker.sha}\``,
-        `- Accepted at: ${marker.acceptedAt}`
       ].join("\n");
   }
 }

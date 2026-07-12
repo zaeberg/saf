@@ -27,19 +27,11 @@ export async function readWorkflowFacts(config: SafConfigV1, issueNumber: number
   }
 
   let checks = null;
-  let acceptance: WorkflowFacts["acceptance"] = null;
   const markerFindings = [...issueMarkers.findings];
   if (pullRequest) {
-    const acceptanceMarkers = parseMarkers(pullRequest.comments, issueNumber);
-    markerFindings.push(...acceptanceMarkers.findings);
-    const [checksResult, acceptanceStatusResult] = await Promise.all([
-      github.getChecks(config.github.repository, pullRequest.headSha),
-      github.getCommitStatus(config.github.repository, pullRequest.headSha, "saf/human-acceptance")
-    ]);
+    const checksResult = await github.getChecks(config.github.repository, pullRequest.headSha);
     if (!checksResult.ok) return checksResult;
-    if (!acceptanceStatusResult.ok) return acceptanceStatusResult;
     checks = checksResult.data;
-    acceptance = { evidence: acceptanceMarkers.acceptance ?? null, statusForCurrentSha: acceptanceStatusResult.data.present };
   }
 
   return success({
@@ -49,7 +41,6 @@ export async function readWorkflowFacts(config: SafConfigV1, issueNumber: number
     run: issueMarkers.run ?? null,
     pullRequest,
     checks,
-    acceptance,
     git: gitResult.data,
     markerFindings
   });

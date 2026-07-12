@@ -1,5 +1,7 @@
 # SAF-006 — Human review and SHA-bound acceptance
 
+> Исторический план. Текущий `saf review` запускает Ralphex review; human review и merge выполняются в GitHub без SAF acceptance marker/status.
+
 ## Dependencies
 
 - SAF-005 завершён и принят.

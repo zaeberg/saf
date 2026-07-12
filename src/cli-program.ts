@@ -8,19 +8,15 @@ import { runCommand } from "./runner/command-runner.js";
 import { renderHumanStatus } from "./status/report.js";
 import { getStatus } from "./status/status.js";
 import { shapeIssue } from "./shape/shape.js";
-import { revisePlan, runPlanner } from "./shape/planner.js";
-import { reviewPlan } from "./shape/review.js";
+import { runPlanner } from "./shape/planner.js";
 import { buildIssue } from "./build/build.js";
-import { runRalphex, runValidation } from "./build/execution.js";
+import { runRalphex, runRalphexReview, runValidation } from "./build/execution.js";
 import { reviewIssue } from "./review/review.js";
-import { reviewDiff } from "./review/revdiff.js";
-import { writeReviewPacket } from "./review/packet.js";
 
 export interface CliIo {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
   confirm?: (message: string) => Promise<boolean>;
-  input?: (message: string) => Promise<string>;
   cwd?: string;
   interactive?: boolean;
 }
@@ -76,11 +72,9 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
     .description("shape one GitHub Issue into an approved plan")
     .argument("<issue>", "positive GitHub Issue number")
     .option("--plan <path>", "import an existing plan instead of launching the planner")
-    .option("--yes", "explicitly approve the reviewed plan", false)
-    .action(async (issueValue: string, options: { plan?: string; yes: boolean }, command: Command) => {
+    .action(async (issueValue: string, options: { plan?: string }, command: Command) => {
       const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
-      const confirm = io.confirm ?? (async () => false);
-      const result = await shapeIssue({ issue: Number(issueValue), ...(options.plan ? { planPath: options.plan } : {}), dryRun: globals.dryRun === true, yes: options.yes, interactive: io.interactive === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, prompt: { confirm }, planner: runPlanner, reviser: revisePlan, reviewer: reviewPlan });
+      const result = await shapeIssue({ issue: Number(issueValue), ...(options.plan ? { planPath: options.plan } : {}), dryRun: globals.dryRun === true, interactive: io.interactive === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, planner: runPlanner });
       const rendered = renderResult(result, globals.json === true ? "json" : "human");
       if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
       commandExitCode = exitCodeFor(result.diagnostics);
@@ -89,21 +83,28 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
   program.command("build")
     .description("execute an approved plan and create a Draft Pull Request")
     .argument("<issue>", "positive GitHub Issue number")
-    .action(async (issueValue: string, _options: unknown, command: Command) => {
+    .option("--tasks-only", "run only Ralphex task phase and skip reviews")
+    .option("--task-model <model>", "Ralphex task model as model[:effort]")
+    .action(async (issueValue: string, options: { tasksOnly?: boolean; taskModel?: string }, command: Command) => {
       const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
-      const result = await buildIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphex, validation: runValidation });
+      const result = await buildIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, ...(options.tasksOnly === true ? { tasksOnly: true } : {}), ...(options.taskModel ? { taskModel: options.taskModel } : {}), cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphex, validation: runValidation });
       const rendered = renderResult(result, globals.json === true ? "json" : "human");
       if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
       commandExitCode = exitCodeFor(result.diagnostics);
     });
 
   program.command("review")
-    .description("review a Draft Pull Request and accept its exact head SHA")
+    .description("run the Ralphex automated review pipeline")
     .argument("<issue>", "positive GitHub Issue number")
-    .option("--sha <sha>", "explicit current head SHA for non-interactive acceptance")
-    .action(async (issueValue: string, options: { sha?: string }, command: Command) => {
+    .option("--review-model <model>", "Ralphex review model as model[:effort]")
+    .option("--external-review-tool <tool>", "external review tool: codex, custom or none")
+    .action(async (issueValue: string, options: { reviewModel?: string; externalReviewTool?: string }, command: Command) => {
       const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
-      const result = await reviewIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, ...(options.sha ? { confirmationSha: options.sha } : {}), interactive: io.interactive === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, prompt: { input: io.input ?? (async () => "") }, reviewer: reviewDiff, writePacket: writeReviewPacket });
+      const tool = options.externalReviewTool;
+      const validTool = tool === undefined || tool === "codex" || tool === "custom" || tool === "none";
+      const result = validTool
+        ? await reviewIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, ...(options.reviewModel ? { reviewModel: options.reviewModel } : {}), ...(tool ? { externalReviewTool: tool } : {}), cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphexReview, validation: runValidation })
+        : failureReviewTool(tool);
       const rendered = renderResult(result, globals.json === true ? "json" : "human");
       if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
       commandExitCode = exitCodeFor(result.diagnostics);
@@ -121,6 +122,10 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
     }
     throw error;
   }
+}
+
+function failureReviewTool(tool: string) {
+  return { ok: false as const, diagnostics: [{ code: "INVALID_ARGUMENT" as const, severity: "error" as const, message: `Invalid external review tool: ${tool}`, remediation: "Use codex, custom or none." }] };
 }
 
 function collect(value: string, previous: string[]): string[] {

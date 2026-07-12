@@ -32,9 +32,8 @@ describe("saf status integration", () => {
         { id: 2, body: serializeMarker(run), createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" }
       ] }),
       getProjectItem: async () => success({ id: "item", status: "Review" }),
-      getPullRequest: async () => success({ number: 7, state: "open", draft: true, merged: false, headSha: "a".repeat(40), branch: "saf/42", url: "https://example.test/7", comments: [] }),
-      getChecks: async () => success({ state: "success", total: 1, failing: [] }),
-      getCommitStatus: async (_repository, sha) => success({ present: false, sha })
+      getPullRequest: async () => success({ number: 7, state: "open", draft: true, merged: false, headSha: "a".repeat(40), branch: "saf/42", url: "https://example.test/7" }),
+      getChecks: async () => success({ state: "success", total: 1, failing: [] })
     };
     const execute = executor(root, "saf/42");
     const result = await getStatus(42, root, { execute, github: async () => success(reviewAdapter) });
@@ -43,7 +42,7 @@ describe("saf status integration", () => {
 });
 
 const marker: ApprovedPlanMarker = { version: 1, kind: "approved-plan", issue: 42, revision: 1, normalizationVersion: 1, sha256: hashPlan("plan"), plan: "plan" };
-const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { plansDirectory: "docs/plans/active" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1 }, review: { adapter: "revdiff" }, validation: { commands: ["pnpm check"] } };
+const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { plansDirectory: "docs/plans" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1, tasksOnly: false }, review: { adapter: "ralphex-codex", externalReviewTool: "none" }, validation: { commands: ["pnpm check"] } };
 const adapter: GitHubAdapter = {
   getRepository: async () => success({ repository: "zbrg/saf", defaultBranch: "master" }),
   getProject: async () => success({ id: "project", title: "SAF", statusFieldId: "status", statusOptions: [] }),
@@ -51,14 +50,12 @@ const adapter: GitHubAdapter = {
   getProjectItem: async () => success({ id: "item", status: "Ready" }),
   getPullRequest: async () => { throw new Error("unexpected PR read"); },
   getChecks: async () => { throw new Error("unexpected checks read"); },
-  getCommitStatus: async () => { throw new Error("unexpected status read"); },
   setProjectItemStatus: async () => { throw new Error("unexpected mutation"); },
   createIssueComment: async () => { throw new Error("unexpected mutation"); },
   updateIssueComment: async () => { throw new Error("unexpected mutation"); },
   findPullRequestByBranch: async () => { throw new Error("unexpected read"); },
   createOrUpdateDraftPullRequest: async () => { throw new Error("unexpected mutation"); },
-  addPullRequestToProject: async () => { throw new Error("unexpected mutation"); },
-  createCommitStatus: async () => { throw new Error("unexpected mutation"); }
+  addPullRequestToProject: async () => { throw new Error("unexpected mutation"); }
 };
 
 function executor(root: string, branch = "master") {

@@ -1,5 +1,5 @@
 import type { CheckDetails, IssueDetails, ProjectItemDetails, PullRequestDetails } from "../github/types.js";
-import type { AcceptanceMarker, ApprovedPlanMarker, MarkerFinding, RunMarker } from "./markers.js";
+import type { ApprovedPlanMarker, MarkerFinding, RunMarker } from "./markers.js";
 
 export interface GitFacts {
   currentBranch: string | null;
@@ -14,7 +14,6 @@ export interface WorkflowFacts {
   run: RunMarker | null;
   pullRequest: PullRequestDetails | null;
   checks: CheckDetails | null;
-  acceptance: { evidence: AcceptanceMarker | null; statusForCurrentSha: boolean } | null;
   git: GitFacts;
   markerFindings: MarkerFinding[];
 }
@@ -22,7 +21,7 @@ export interface WorkflowFacts {
 export type DerivedState = "Inbox" | "Shaping" | "Ready" | "Running" | "Review" | "Blocked" | "Done" | "Cancelled";
 
 export interface DriftFinding {
-  code: "MARKER_UNKNOWN_VERSION" | "MARKER_INVALID" | "MARKER_CONFLICT" | "PLAN_HASH_MISMATCH" | "PROJECT_STATUS_DRIFT" | "STALE_ACCEPTANCE" | "BRANCH_DRIFT" | "PULL_REQUEST_DRIFT" | "CI_FAILED";
+  code: "MARKER_UNKNOWN_VERSION" | "MARKER_INVALID" | "MARKER_CONFLICT" | "PLAN_HASH_MISMATCH" | "PROJECT_STATUS_DRIFT" | "BRANCH_DRIFT" | "PULL_REQUEST_DRIFT" | "CI_FAILED";
   severity: "warning" | "error";
   message: string;
 }

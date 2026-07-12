@@ -1,5 +1,7 @@
 # SAF-004 — Issue to approved plan
 
+> Исторический план. Текущий упрощённый contract доверяет review внутри `planning:make`; SAF больше не запускает собственный revdiff/approval loop.
+
 ## Dependencies
 
 - SAF-003 завершён и принят.

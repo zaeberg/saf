@@ -22,10 +22,14 @@ export const configSchemaV1 = z.strictObject({
   }),
   execution: z.strictObject({
     adapter: z.literal("ralphex-codex"),
-    maxConcurrentRuns: z.literal(1)
+    maxConcurrentRuns: z.literal(1),
+    tasksOnly: z.boolean().default(false),
+    taskModel: z.string().min(1).optional()
   }),
   review: z.strictObject({
-    adapter: z.literal("revdiff")
+    adapter: z.union([z.literal("ralphex-codex"), z.literal("revdiff")]).transform(() => "ralphex-codex" as const),
+    model: z.string().min(1).optional(),
+    externalReviewTool: z.enum(["codex", "custom", "none"]).default("none")
   }),
   validation: z.strictObject({
     commands: z.array(z.string().min(1)).min(1)

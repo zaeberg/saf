@@ -3,6 +3,8 @@ import { failure, success, type CommandResult } from "../contracts/result.js";
 import { runCommand, type CommandInvocation } from "../runner/command-runner.js";
 
 export interface ValidationEvidence { command: string; exitCode: number; completedAt: string; }
+export interface RalphexBuildOptions { tasksOnly: boolean; taskModel?: string; }
+export interface RalphexReviewOptions { reviewModel?: string; externalReviewTool: "codex" | "custom" | "none"; baseRef: string; }
 export type BuildExecutor = (invocation: CommandInvocation) => ReturnType<typeof runCommand>;
 
 export async function checkBuildTools(root: string, execute: BuildExecutor = runCommand): Promise<CommandResult<void>> {
@@ -17,11 +19,20 @@ export async function checkBuildTools(root: string, execute: BuildExecutor = run
   return success(undefined);
 }
 
-export async function runRalphex(root: string, planPath: string, branch: string, execute: BuildExecutor = runCommand): Promise<CommandResult<void>> {
-  const result = await execute({ command: "ralphex", args: ["--codex", `--branch=${branch}`, planPath], cwd: root, stdio: "inherit" });
+export async function runRalphex(root: string, planPath: string, branch: string, options: RalphexBuildOptions, execute: BuildExecutor = runCommand): Promise<CommandResult<void>> {
+  const args = ["--codex", `--branch=${branch}`, ...(options.tasksOnly ? ["--tasks-only"] : []), ...(options.taskModel ? [`--task-model=${options.taskModel}`] : []), planPath];
+  const result = await execute({ command: "ralphex", args, cwd: root, stdio: "inherit" });
   if (result.ok) return success(undefined);
   if (result.diagnostics.some((diagnostic) => diagnostic.code === "COMMAND_CANCELLED")) return result;
   return failure([{ code: "COMMAND_FAILED", severity: "error", message: "Ralphex execution failed.", remediation: "Inspect the preserved branch and rerun saf build for recovery." }]);
+}
+
+export async function runRalphexReview(root: string, planPath: string, options: RalphexReviewOptions, execute: BuildExecutor = runCommand): Promise<CommandResult<void>> {
+  const args = ["--review", "--codex", `--external-review-tool=${options.externalReviewTool}`, `--base-ref=${options.baseRef}`, ...(options.reviewModel ? [`--review-model=${options.reviewModel}`] : []), planPath];
+  const result = await execute({ command: "ralphex", args, cwd: root, stdio: "inherit" });
+  if (result.ok) return success(undefined);
+  if (result.diagnostics.some((diagnostic) => diagnostic.code === "COMMAND_CANCELLED")) return result;
+  return failure([{ code: "COMMAND_FAILED", severity: "error", message: "Ralphex review failed.", remediation: "Inspect Ralphex output, fix the cause and rerun saf review." }]);
 }
 
 export async function runValidation(root: string, commands: string[], execute: BuildExecutor = runCommand): Promise<CommandResult<ValidationEvidence[]>> {

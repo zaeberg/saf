@@ -30,17 +30,13 @@ export interface ProjectItemDetails {
 
 export interface PullRequestDetails {
   number: number;
-  title?: string;
-  body?: string;
   state: "open" | "closed";
   draft: boolean;
   merged: boolean;
   headSha: string;
   branch: string;
   url: string;
-  comments: Array<{ id: number; body: string; createdAt: string; updatedAt: string }>;
   nodeId?: string;
-  changedFiles?: string[];
 }
 
 export interface DraftPullRequestInput { title: string; body: string; branch: string; base: string; }
@@ -51,11 +47,6 @@ export interface CheckDetails {
   failing: string[];
 }
 
-export interface CommitStatusDetails {
-  present: boolean;
-  sha: string;
-}
-
 export interface GitHubAdapter {
   getRepository(repository: string): Promise<CommandResult<RepositoryDetails>>;
   getProject(reference: ProjectReference, repository: string): Promise<CommandResult<ProjectDetails>>;
@@ -63,12 +54,10 @@ export interface GitHubAdapter {
   getProjectItem(reference: ProjectReference, repository: string, issue: number): Promise<CommandResult<ProjectItemDetails>>;
   getPullRequest(repository: string, pullRequest: number): Promise<CommandResult<PullRequestDetails>>;
   getChecks(repository: string, sha: string): Promise<CommandResult<CheckDetails>>;
-  getCommitStatus(repository: string, sha: string, context: string): Promise<CommandResult<CommitStatusDetails>>;
   setProjectItemStatus(reference: ProjectReference, repository: string, projectItemId: string, status: string): Promise<CommandResult<void>>;
   createIssueComment(repository: string, issue: number, body: string): Promise<CommandResult<{ id: number }>>;
   updateIssueComment(repository: string, commentId: number, body: string): Promise<CommandResult<{ id: number }>>;
   findPullRequestByBranch(repository: string, branch: string): Promise<CommandResult<PullRequestDetails | null>>;
   createOrUpdateDraftPullRequest(repository: string, input: DraftPullRequestInput): Promise<CommandResult<PullRequestDetails>>;
   addPullRequestToProject(reference: ProjectReference, repository: string, pullRequestNodeId: string): Promise<CommandResult<void>>;
-  createCommitStatus(repository: string, sha: string, context: string, state: "pending" | "success" | "failure" | "error", description: string): Promise<CommandResult<void>>;
 }

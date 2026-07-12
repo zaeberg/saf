@@ -21,7 +21,7 @@ describe("saf init process integration", () => {
     await executeFile("git", ["-C", root, "remote", "add", "origin", "git@github.com:zbrg/saf.git"]);
     await writeFile(join(root, "package.json"), JSON.stringify({ packageManager: "pnpm@10.0.0", scripts: { check: "vitest run" } }));
     await fakeExecutable(join(bin, "gh"), ghScript());
-    for (const tool of ["claude", "ralphex", "codex", "revdiff"]) await fakeExecutable(join(bin, tool), "#!/bin/sh\nprintf '%s\\n' '1.0.0'\n");
+    for (const tool of ["claude", "ralphex", "codex"]) await fakeExecutable(join(bin, tool), "#!/bin/sh\nprintf '%s\\n' '1.0.0'\n");
 
     const originalPath = process.env.PATH;
     process.env.PATH = `${bin}:${originalPath ?? ""}`;
@@ -55,14 +55,12 @@ const fakeAdapter: GitHubAdapter = {
   getProject: async () => ({ ok: true, data: { id: "PVT_1", title: "SAF", statusFieldId: "status", statusOptions: [] }, diagnostics: [] }),
   getIssue: async () => ({ ok: true, data: { number: 1, title: "Issue", state: "open", body: "", comments: [] }, diagnostics: [] }),
   getProjectItem: async () => ({ ok: true, data: { id: "item", status: "Backlog" }, diagnostics: [] }),
-  getPullRequest: async () => ({ ok: true, data: { number: 1, state: "open", draft: true, merged: false, headSha: "a", branch: "branch", url: "url", comments: [] }, diagnostics: [] }),
+  getPullRequest: async () => ({ ok: true, data: { number: 1, state: "open", draft: true, merged: false, headSha: "a", branch: "branch", url: "url" }, diagnostics: [] }),
   getChecks: async () => ({ ok: true, data: { state: "missing", total: 0, failing: [] }, diagnostics: [] }),
-  getCommitStatus: async () => ({ ok: true, data: { present: false, sha: "a" }, diagnostics: [] }),
   setProjectItemStatus: async () => ({ ok: true, data: undefined, diagnostics: [] }),
   createIssueComment: async () => ({ ok: true, data: { id: 1 }, diagnostics: [] }),
   updateIssueComment: async () => ({ ok: true, data: { id: 1 }, diagnostics: [] }),
   findPullRequestByBranch: async () => ({ ok: true, data: null, diagnostics: [] }),
   createOrUpdateDraftPullRequest: async () => ({ ok: false, diagnostics: [] }),
-  addPullRequestToProject: async () => ({ ok: true, data: undefined, diagnostics: [] }),
-  createCommitStatus: async () => ({ ok: true, data: undefined, diagnostics: [] })
+  addPullRequestToProject: async () => ({ ok: true, data: undefined, diagnostics: [] })
 };

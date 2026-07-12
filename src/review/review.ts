@@ -1,28 +1,24 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { checkBuildTools, runRalphexReview, runValidation, type RalphexReviewOptions } from "../build/execution.js";
+import { ensureRunBranch, pushBranch } from "../build/git.js";
 import { loadConfig } from "../config/load.js";
 import { failure, success, type CommandResult } from "../contracts/result.js";
 import { inspectGitContext } from "../git/context.js";
-import { gitValue } from "../build/git.js";
 import { createAuthenticatedGitHubAdapter } from "../github/auth.js";
-import type { GitHubAdapter, PullRequestDetails } from "../github/types.js";
-import type { PromptAdapter } from "../prompt/prompt-adapter.js";
+import type { GitHubAdapter } from "../github/types.js";
 import { runCommand } from "../runner/command-runner.js";
-import { parseMarkers, serializeMarker, type AcceptanceMarker } from "../status/markers.js";
+import { loadAndLintPlan } from "../shape/plan.js";
 import { readWorkflowFacts } from "../status/reader.js";
-import { createReviewPacket, writeReviewPacket } from "./packet.js";
-import { reviewDiff, type ReviewAnnotation } from "./revdiff.js";
 
-const acceptanceContext = "saf/human-acceptance";
-export interface ReviewOptions { issue: number; dryRun: boolean; cwd: string; confirmationSha?: string; interactive: boolean; }
-export interface ReviewSummary { issue: number; state: "DryRun" | "Accepted"; pullRequest: number; sha: string; annotations: ReviewAnnotation[]; packetPath: string; }
+export interface ReviewOptions { issue: number; dryRun: boolean; cwd: string; reviewModel?: string; externalReviewTool?: RalphexReviewOptions["externalReviewTool"]; }
+export interface ReviewSummary { issue: number; state: "DryRun" | "Reviewed"; pullRequest: number; branch: string; planPath: string; }
 export interface ReviewDependencies {
   execute: typeof runCommand;
   github: (cwd: string, execute: typeof runCommand) => Promise<CommandResult<GitHubAdapter>>;
-  prompt: Pick<PromptAdapter, "input">;
-  reviewer: typeof reviewDiff;
-  writePacket: typeof writeReviewPacket;
+  ralphex: typeof runRalphexReview;
+  validation: typeof runValidation;
 }
-const defaults: ReviewDependencies = { execute: runCommand, github: createAuthenticatedGitHubAdapter, prompt: { input: async () => "" }, reviewer: reviewDiff, writePacket: writeReviewPacket };
+const defaults: ReviewDependencies = { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphexReview, validation: runValidation };
 
 export async function reviewIssue(options: ReviewOptions, dependencies: ReviewDependencies = defaults): Promise<CommandResult<ReviewSummary>> {
   if (!Number.isInteger(options.issue) || options.issue <= 0) return failure([{ code: "INVALID_ARGUMENT", severity: "error", message: `Invalid Issue number: ${options.issue}`, remediation: "Pass a positive GitHub Issue number." }]);
@@ -35,43 +31,26 @@ export async function reviewIssue(options: ReviewOptions, dependencies: ReviewDe
   const facts = await readWorkflowFacts(config.data, options.issue, git.data.root, github.data, dependencies.execute);
   if (!facts.ok) return facts;
   const pullRequest = facts.data.pullRequest;
-  if (!pullRequest || pullRequest.state !== "open" || !pullRequest.draft || pullRequest.merged || !facts.data.approvedPlan || facts.data.run?.state === "failed" || facts.data.markerFindings.length > 0) return failure([{ code: "REVIEW_STATE_INVALID", severity: "error", message: `Issue #${options.issue} has no valid open Draft PR with matching build evidence.`, remediation: `Run saf status ${options.issue} and resolve workflow drift before review.` }]);
-  if (facts.data.checks?.state !== "success") return failure([{ code: "REVIEW_CI_BLOCKED", severity: "error", message: `CI is ${facts.data.checks?.state ?? "missing"} for ${pullRequest.headSha}.`, remediation: "Wait for successful CI or fix failing checks before acceptance." }]);
-  if (facts.data.acceptance?.statusForCurrentSha) return success({ issue: options.issue, state: "Accepted", pullRequest: pullRequest.number, sha: pullRequest.headSha, annotations: [], packetPath: "" });
-  const localHead = await gitValue(git.data.root, ["rev-parse", pullRequest.branch], dependencies.execute);
-  if (!localHead.ok || localHead.data !== pullRequest.headSha) return failure([{ code: "REVIEW_STATE_INVALID", severity: "error", message: `Local branch ${pullRequest.branch} does not match remote head ${pullRequest.headSha}.`, remediation: "Fetch or check out the exact Pull Request head before review." }]);
-
-  const packetPath = join(git.data.root, ".saf/runtime/review", `issue-${options.issue}-${pullRequest.headSha}.md`);
-  const annotationsPath = join(git.data.root, ".saf/runtime/review", `issue-${options.issue}-${pullRequest.headSha}-annotations.md`);
-  try { await dependencies.writePacket(packetPath, createReviewPacket(facts.data)); }
-  catch { return failure([{ code: "COMMAND_FAILED", severity: "error", message: "Unable to write the temporary review packet.", remediation: "Check .saf/runtime permissions and retry." }]); }
-  if (options.dryRun) return success({ issue: options.issue, state: "DryRun", pullRequest: pullRequest.number, sha: pullRequest.headSha, annotations: [], packetPath });
-
-  const reviewed = await dependencies.reviewer(git.data.root, config.data.repository.defaultBranch, pullRequest.branch, packetPath, annotationsPath, dependencies.execute);
+  const plan = facts.data.approvedPlan;
+  if (!pullRequest || pullRequest.state !== "open" || pullRequest.merged || !facts.data.run || !plan?.planPath) return failure([{ code: "REVIEW_STATE_INVALID", severity: "error", message: `Issue #${options.issue} has no open Pull Request with an original plan.`, remediation: `Complete saf build ${options.issue} before running automated review.` }]);
+  const planPath = resolve(git.data.root, plan.planPath);
+  const loadedPlan = await loadAndLintPlan(planPath);
+  if (!loadedPlan.ok) return loadedPlan;
+  const tools = await checkBuildTools(git.data.root, dependencies.execute);
+  if (!tools.ok) return tools;
+  if (options.dryRun) return success({ issue: options.issue, state: "DryRun", pullRequest: pullRequest.number, branch: facts.data.run.branch, planPath });
+  const branch = await ensureRunBranch(git.data.root, facts.data.run.branch, facts.data.git.localBranches, facts.data.git.remoteBranches, dependencies.execute);
+  if (!branch.ok) return branch;
+  const reviewModel = options.reviewModel ?? config.data.review.model;
+  const reviewed = await dependencies.ralphex(git.data.root, planPath, {
+    baseRef: config.data.repository.defaultBranch,
+    externalReviewTool: options.externalReviewTool ?? config.data.review.externalReviewTool,
+    ...(reviewModel ? { reviewModel } : {})
+  }, dependencies.execute);
   if (!reviewed.ok) return reviewed;
-  const blocking = reviewed.data.annotations.filter((annotation) => annotation.severity === "blocking");
-  if (blocking.length > 0) return failure([{ code: "REVIEW_ANNOTATIONS_BLOCKING", severity: "error", message: `${blocking.length} blocking revdiff annotation(s) must be resolved.`, remediation: `Resolve findings in ${annotationsPath}, push a new commit and rerun saf review.` }]);
-
-  const confirmation = options.confirmationSha ?? (options.interactive ? await dependencies.prompt.input(`Type current head SHA ${pullRequest.headSha} to accept`) : "");
-  if (confirmation.trim() !== pullRequest.headSha) return failure([{ code: "REVIEW_CONFIRMATION_MISMATCH", severity: "error", message: "Typed SHA does not match the reviewed head SHA.", remediation: "Rerun saf review and type the complete current SHA." }]);
-  const fresh = await github.data.getPullRequest(config.data.github.repository, pullRequest.number);
-  if (!fresh.ok) return fresh;
-  if (fresh.data.headSha !== pullRequest.headSha) return failure([{ code: "REVIEW_HEAD_CHANGED", severity: "error", message: `Pull Request head changed from ${pullRequest.headSha} to ${fresh.data.headSha} during review.`, remediation: "Review the new diff and accept its exact SHA." }]);
-
-  const marker: AcceptanceMarker = { version: 1, kind: "human-acceptance", issue: options.issue, sha: pullRequest.headSha, acceptedAt: new Date().toISOString() };
-  const published = await publishAcceptance(github.data, config.data.github.repository, fresh.data, marker);
-  if (!published.ok) return published;
-  const status = await github.data.createCommitStatus(config.data.github.repository, pullRequest.headSha, acceptanceContext, "success", `Human acceptance for Issue #${options.issue}`);
-  if (!status.ok) return status;
-  return success({ issue: options.issue, state: "Accepted", pullRequest: pullRequest.number, sha: pullRequest.headSha, annotations: reviewed.data.annotations, packetPath });
-}
-
-async function publishAcceptance(github: GitHubAdapter, repository: string, pullRequest: PullRequestDetails, marker: AcceptanceMarker): Promise<CommandResult<void>> {
-  const parsed = parseMarkers(pullRequest.comments, marker.issue);
-  if (parsed.acceptance?.sha === marker.sha && parsed.acceptanceCommentId) {
-    const updated = await github.updateIssueComment(repository, parsed.acceptanceCommentId, serializeMarker(marker));
-    return updated.ok ? success(undefined) : updated;
-  }
-  const created = await github.createIssueComment(repository, pullRequest.number, serializeMarker(marker));
-  return created.ok ? success(undefined) : created;
+  const validation = await dependencies.validation(git.data.root, config.data.validation.commands, dependencies.execute);
+  if (!validation.ok) return validation;
+  const pushed = await pushBranch(git.data.root, facts.data.run.branch, dependencies.execute);
+  if (!pushed.ok) return pushed;
+  return success({ issue: options.issue, state: "Reviewed", pullRequest: pullRequest.number, branch: facts.data.run.branch, planPath });
 }

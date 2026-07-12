@@ -14,14 +14,16 @@ github:
 repository:
   defaultBranch: main
 documentation:
-  plansDirectory: docs/plans/active
+  plansDirectory: docs/plans
 planning:
   adapter: claude-glm
 execution:
   adapter: ralphex-codex
   maxConcurrentRuns: 1
+  tasksOnly: false
 review:
-  adapter: revdiff
+  adapter: ralphex-codex
+  externalReviewTool: none
 validation:
   commands:
     - pnpm check
@@ -48,6 +50,11 @@ describe("loadConfig", () => {
     const path = await fixture(`${validConfig}\nunknown: true\n`);
     const result = await loadConfig(path);
     expect(result.ok).toBe(false);
+  });
+
+  it("migrates the legacy revdiff adapter to Ralphex review defaults", async () => {
+    const result = await loadConfig(await fixture(validConfig.replace("adapter: ralphex-codex\n  externalReviewTool: none", "adapter: revdiff")));
+    expect(result).toMatchObject({ ok: true, data: { review: { adapter: "ralphex-codex", externalReviewTool: "none" } } });
   });
 });
 

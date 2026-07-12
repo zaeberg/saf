@@ -10,7 +10,6 @@ export interface StatusReport {
   branch: string | null;
   pullRequest: { number: number; state: string; draft: boolean; merged: boolean; headSha: string; url: string } | null;
   ci: string | null;
-  humanAcceptance: { presentForCurrentSha: boolean; evidenceSha: string | null } | null;
   findings: StateDerivation["findings"];
   blockers: StateDerivation["blockers"];
   nextAction: string;
@@ -25,7 +24,6 @@ export function createStatusReport(facts: WorkflowFacts, derivation: StateDeriva
     branch: facts.run?.branch ?? facts.pullRequest?.branch ?? null,
     pullRequest: facts.pullRequest ? { number: facts.pullRequest.number, state: facts.pullRequest.state, draft: facts.pullRequest.draft, merged: facts.pullRequest.merged, headSha: facts.pullRequest.headSha, url: facts.pullRequest.url } : null,
     ci: facts.checks?.state ?? null,
-    humanAcceptance: facts.acceptance ? { presentForCurrentSha: facts.acceptance.statusForCurrentSha, evidenceSha: facts.acceptance.evidence?.sha ?? null } : null,
     findings: derivation.findings,
     blockers: derivation.blockers,
     nextAction: derivation.nextAction
@@ -42,8 +40,7 @@ export function renderHumanStatus(result: CommandResult<StatusReport>): string {
     `Plan: ${report.plan ? `r${report.plan.revision}, ${report.plan.valid ? "valid" : "invalid"}, ${report.plan.sha256}` : "missing"}`,
     `Branch: ${report.branch ?? "missing"}`,
     `Pull Request: ${report.pullRequest ? `#${report.pullRequest.number}, ${report.pullRequest.merged ? "merged" : report.pullRequest.state}${report.pullRequest.draft ? ", Draft" : ""}` : "missing"}`,
-    `CI: ${report.ci ?? "unknown"}`,
-    `Human acceptance: ${report.humanAcceptance?.presentForCurrentSha ? "present for current SHA" : "missing for current SHA"}`
+    `CI: ${report.ci ?? "unknown"}`
   ];
   for (const finding of report.findings) lines.push(`Finding [${finding.code}]: ${finding.message}`);
   lines.push(`Next action: ${report.nextAction}`);

@@ -30,9 +30,6 @@ export function deriveState(facts: WorkflowFacts): StateDerivation {
     findings.push({ code: "CI_FAILED", severity: "error", message: `CI failed: ${facts.checks.failing.join(", ") || "unknown check"}.` });
     state = "Blocked";
   }
-  if (facts.acceptance?.evidence && facts.pullRequest && facts.acceptance.evidence.sha !== facts.pullRequest.headSha) {
-    findings.push({ code: "STALE_ACCEPTANCE", severity: "warning", message: `Human acceptance targets ${facts.acceptance.evidence.sha}, not current SHA ${facts.pullRequest.headSha}.` });
-  }
   if (facts.projectItem.status === "Done" && !facts.pullRequest?.merged) {
     findings.push({ code: "PROJECT_STATUS_DRIFT", severity: "error", message: "Project Status is Done but the Pull Request is not merged." });
     state = "Blocked";
@@ -66,7 +63,7 @@ function nextAction(state: DerivedState, facts: WorkflowFacts): string {
     case "Shaping": return `saf shape ${facts.issue.number}`;
     case "Ready": return `saf build ${facts.issue.number}`;
     case "Running": return `saf status ${facts.issue.number}`;
-    case "Review": return facts.acceptance?.statusForCurrentSha ? "manual merge" : `saf review ${facts.issue.number}`;
+    case "Review": return `saf review ${facts.issue.number} (optional), then review and merge in GitHub`;
     case "Blocked": return "resolve blockers, then rerun saf status";
     case "Done": return "manual cleanup";
     case "Cancelled": return "no action";

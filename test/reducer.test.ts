@@ -19,13 +19,6 @@ describe("workflow reducer", () => {
     expect(deriveState(input).state).toBe(expected);
   });
 
-  it("detects stale acceptance without leaving Review", () => {
-    const input = facts({ projectStatus: "Review", run, pullRequest: pr(), acceptanceSha: "b".repeat(40) });
-    const result = deriveState(input);
-    expect(result.state).toBe("Review");
-    expect(result.findings).toContainEqual(expect.objectContaining({ code: "STALE_ACCEPTANCE" }));
-  });
-
   it("blocks Project Done without a merged PR", () => {
     const result = deriveState(facts({ projectStatus: "Done", run, pullRequest: pr() }));
     expect(result.state).toBe("Blocked");
@@ -43,7 +36,7 @@ describe("workflow reducer", () => {
   });
 });
 
-function facts(overrides: { projectStatus?: string; approvedPlan?: ApprovedPlanMarker; run?: RunMarker; pullRequest?: WorkflowFacts["pullRequest"]; issueState?: "open" | "closed"; acceptanceSha?: string; markerFinding?: "MARKER_CONFLICT" } = {}): WorkflowFacts {
+function facts(overrides: { projectStatus?: string; approvedPlan?: ApprovedPlanMarker; run?: RunMarker; pullRequest?: WorkflowFacts["pullRequest"]; issueState?: "open" | "closed"; markerFinding?: "MARKER_CONFLICT" } = {}): WorkflowFacts {
   return {
     issue: { number: 42, title: "Test", state: overrides.issueState ?? "open", body: "", comments: [] },
     projectItem: { id: "item", status: overrides.projectStatus ?? "Backlog" },
@@ -51,12 +44,11 @@ function facts(overrides: { projectStatus?: string; approvedPlan?: ApprovedPlanM
     run: overrides.run ?? null,
     pullRequest: overrides.pullRequest ?? null,
     checks: overrides.pullRequest ? { state: "success", total: 1, failing: [] } : null,
-    acceptance: overrides.pullRequest ? { evidence: overrides.acceptanceSha ? { version: 1, kind: "human-acceptance", issue: 42, sha: overrides.acceptanceSha, acceptedAt: "2026-07-12T00:00:00.000Z" } : null, statusForCurrentSha: false } : null,
     git: { currentBranch: overrides.run?.branch ?? null, localBranches: overrides.run ? [overrides.run.branch] : [], remoteBranches: [] },
     markerFindings: overrides.markerFinding ? [{ code: overrides.markerFinding, message: "conflict" }] : []
   };
 }
 
 function pr(overrides: Partial<NonNullable<WorkflowFacts["pullRequest"]>> = {}): NonNullable<WorkflowFacts["pullRequest"]> {
-  return { number: 51, state: "open", draft: true, merged: false, headSha: "a".repeat(40), branch: "feat/42", url: "https://example.test/pr/51", comments: [], ...overrides };
+  return { number: 51, state: "open", draft: true, merged: false, headSha: "a".repeat(40), branch: "feat/42", url: "https://example.test/pr/51", ...overrides };
 }

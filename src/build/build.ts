@@ -1,5 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { loadConfig } from "../config/load.js";
 import type { SafConfigV1 } from "../config/schema.js";
 import { failure, success, type CommandResult } from "../contracts/result.js";
@@ -7,14 +6,15 @@ import { inspectGitContext } from "../git/context.js";
 import { createAuthenticatedGitHubAdapter } from "../github/auth.js";
 import type { GitHubAdapter, PullRequestDetails } from "../github/types.js";
 import { runCommand } from "../runner/command-runner.js";
-import { parseMarkers, serializeMarker, type RunMarker } from "../status/markers.js";
+import { hashPlan, parseMarkers, serializeMarker, type RunMarker } from "../status/markers.js";
 import { readWorkflowFacts } from "../status/reader.js";
 import { deriveState } from "../status/reducer.js";
 import { checkBuildTools, runRalphex, runValidation, type ValidationEvidence } from "./execution.js";
+import { loadAndLintPlan } from "../shape/plan.js";
 import { checkWorkspace, ensureRunBranch, gitValue, pushBranch } from "./git.js";
 import { acquireRunLock } from "./lock.js";
 
-export interface BuildOptions { issue: number; dryRun: boolean; cwd: string; }
+export interface BuildOptions { issue: number; dryRun: boolean; cwd: string; tasksOnly?: boolean; taskModel?: string; }
 export interface BuildSummary { issue: number; state: "DryRun" | "Review"; runId: string; branch: string; pullRequest: number | null; validation: ValidationEvidence[]; }
 export interface BuildDependencies {
   execute: typeof runCommand;
@@ -42,6 +42,11 @@ export async function buildIssue(options: BuildOptions, dependencies: BuildDepen
   if (!plan || facts.data.markerFindings.some((finding) => finding.code === "PLAN_HASH_MISMATCH")) return failure([{ code: "BUILD_STATE_INVALID", severity: "error", message: "A valid approved plan is required.", remediation: `Run saf shape ${options.issue}.` }]);
   const tools = await checkBuildTools(git.data.root, dependencies.execute);
   if (!tools.ok) return tools;
+  if (!plan.planPath) return failure([{ code: "PLAN_NOT_FOUND", severity: "error", message: "Approved plan has no repository path.", remediation: `Rerun saf shape ${options.issue} with the original plan under ${config.data.documentation.plansDirectory}.` }]);
+  const planPath = resolve(git.data.root, plan.planPath);
+  const workingPlan = await loadAndLintPlan(planPath);
+  if (!workingPlan.ok) return workingPlan;
+  if (!facts.data.run && hashPlan(workingPlan.data.content) !== plan.sha256) return failure([{ code: "PLAN_INVALID", severity: "error", message: "Original plan changed after shape approval.", remediation: `Rerun saf shape ${options.issue} to approve the current plan revision.` }]);
   if (!facts.data.run) {
     const workspace = await checkWorkspace(git.data.root, plan.planPath, dependencies.execute);
     if (!workspace.ok) return workspace;
@@ -65,18 +70,10 @@ export async function buildIssue(options: BuildOptions, dependencies: BuildDepen
       const running = await github.data.setProjectItemStatus(config.data.github.project, config.data.github.repository, facts.data.projectItem.id, "Running");
       if (!running.ok) return await failBuild(github.data, config.data, facts.data.projectItem.id, currentMarker, runCommentIds, "project", running);
     }
-    const runtimeDirectory = join(git.data.root, ".saf/runtime/build", runId);
-    const planPath = join(runtimeDirectory, "approved-plan.md");
-    try {
-      await mkdir(runtimeDirectory, { recursive: true });
-      await writeFile(planPath, plan.plan, "utf8");
-    } catch {
-      return await failBuild(github.data, config.data, facts.data.projectItem.id, currentMarker, runCommentIds, "runtime", failure([{ code: "COMMAND_FAILED", severity: "error", message: "Unable to materialize the approved plan in SAF runtime.", remediation: "Check .saf/runtime permissions and retry." }]));
-    }
-
     const shouldExecute = currentMarker.state === "started" || currentMarker.failurePhase === "execution";
     if (shouldExecute) {
-      const execution = await dependencies.ralphex(git.data.root, planPath, branch, dependencies.execute);
+      const taskModel = options.taskModel ?? config.data.execution.taskModel;
+      const execution = await dependencies.ralphex(git.data.root, planPath, branch, { tasksOnly: options.tasksOnly ?? config.data.execution.tasksOnly, ...(taskModel ? { taskModel } : {}) }, dependencies.execute);
       if (!execution.ok) return await failBuild(github.data, config.data, facts.data.projectItem.id, currentMarker, runCommentIds, "execution", execution);
       currentMarker = { ...currentMarker, state: "succeeded", completedAt: new Date().toISOString() };
       const published = await publishRun(github.data, config.data.github.repository, options.issue, currentMarker, runCommentIds);

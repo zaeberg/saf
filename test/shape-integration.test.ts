@@ -15,7 +15,7 @@ describe("saf shape integration", () => {
     const fixture = await shapeFixture();
     const github = statefulAdapter();
     const dependencies = shapeDependencies(fixture.root, github.adapter);
-    const options = { issue: 42, planPath: fixture.planPath, dryRun: false, yes: true, interactive: false, cwd: fixture.root };
+    const options = { issue: 42, planPath: fixture.planPath, dryRun: false, interactive: false, cwd: fixture.root };
     const first = await shapeIssue(options, dependencies);
     expect(first).toMatchObject({ ok: true, data: { state: "Ready", revision: 1, commentChanged: true } });
     expect(github.statuses).toEqual(["Shaping", "Ready"]);
@@ -38,41 +38,23 @@ describe("saf shape integration", () => {
   it("does not publish or transition during dry-run", async () => {
     const fixture = await shapeFixture();
     const github = statefulAdapter();
-    const reviewer = vi.fn(async () => success({ annotations: false }));
-    const dependencies = { ...shapeDependencies(fixture.root, github.adapter), reviewer };
-    const result = await shapeIssue({ issue: 42, planPath: fixture.planPath, dryRun: true, yes: false, interactive: false, cwd: fixture.root }, dependencies);
+    const dependencies = shapeDependencies(fixture.root, github.adapter);
+    const result = await shapeIssue({ issue: 42, planPath: fixture.planPath, dryRun: true, interactive: false, cwd: fixture.root }, dependencies);
     expect(result).toMatchObject({ ok: true, data: { state: "DryRun", commentChanged: false } });
     expect(github.statuses).toEqual([]);
     expect(github.comments).toEqual([]);
-    expect(reviewer).not.toHaveBeenCalled();
   });
 
-  it("does not transition to Ready when revdiff fails", async () => {
-    const fixture = await shapeFixture();
-    const github = statefulAdapter();
-    const reviewer = vi.fn(async () => failure([{ code: "COMMAND_FAILED", severity: "error", message: "revdiff failed", remediation: "retry" }]));
-    const result = await shapeIssue({ issue: 42, planPath: fixture.planPath, dryRun: false, yes: true, interactive: false, cwd: fixture.root }, { ...shapeDependencies(fixture.root, github.adapter), reviewer });
-    expect(result).toMatchObject({ ok: false });
-    expect(github.statuses).toEqual(["Shaping"]);
-    expect(github.comments).toEqual([]);
-  });
-
-  it("runs planner mode and repeats review after annotations", async () => {
+  it("trusts a successfully completed planning session and publishes its plan", async () => {
     const fixture = await shapeFixture();
     const github = statefulAdapter();
     const planner = vi.fn(async () => success(fixture.planPath));
-    const reviewer = vi.fn()
-      .mockResolvedValueOnce(success({ annotations: true }))
-      .mockResolvedValueOnce(success({ annotations: false }));
-    const reviser = vi.fn(async () => success(undefined));
     const result = await shapeIssue(
-      { issue: 42, dryRun: false, yes: true, interactive: true, cwd: fixture.root },
-      { ...shapeDependencies(fixture.root, github.adapter), planner, reviewer, reviser }
+      { issue: 42, dryRun: false, interactive: true, cwd: fixture.root },
+      { ...shapeDependencies(fixture.root, github.adapter), planner }
     );
     expect(result).toMatchObject({ ok: true, data: { state: "Ready" } });
     expect(planner).toHaveBeenCalledOnce();
-    expect(reviewer).toHaveBeenCalledTimes(2);
-    expect(reviser).toHaveBeenCalledOnce();
   });
 
   it("leaves the Issue in Shaping when planner fails", async () => {
@@ -80,7 +62,7 @@ describe("saf shape integration", () => {
     const github = statefulAdapter();
     const planner = vi.fn(async () => failure<string>([{ code: "COMMAND_FAILED", severity: "error", message: "planner failed", remediation: "retry" }]));
     const result = await shapeIssue(
-      { issue: 42, dryRun: false, yes: true, interactive: true, cwd: fixture.root },
+      { issue: 42, dryRun: false, interactive: true, cwd: fixture.root },
       { ...shapeDependencies(fixture.root, github.adapter), planner }
     );
     expect(result).toMatchObject({ ok: false });
@@ -93,9 +75,10 @@ async function shapeFixture(): Promise<{ root: string; planPath: string }> {
   const root = await mkdtemp(join(tmpdir(), "saf-shape-"));
   await mkdir(join(root, ".git"));
   await mkdir(join(root, ".saf"));
+  await mkdir(join(root, "docs/plans"), { recursive: true });
   await writeFile(join(root, ".saf/config.yaml"), stringify(config));
   await writeFile(join(root, "AGENTS.md"), "# Agents\n");
-  const planPath = join(root, "plan.md");
+  const planPath = join(root, "docs/plans/plan.md");
   await writeFile(planPath, validPlan);
   return { root, planPath };
 }
@@ -112,14 +95,12 @@ function statefulAdapter(): { adapter: GitHubAdapter; issue: IssueDetails; statu
     getProjectItem: async () => success({ id: "item", status: projectStatus }),
     getPullRequest: async () => failure([]),
     getChecks: async () => failure([]),
-    getCommitStatus: async () => failure([]),
     setProjectItemStatus: async (_reference, _repository, _item, status) => { projectStatus = status; statuses.push(status); return success(undefined); },
     createIssueComment: async (_repository, _issue, body) => { comments.push(body); issue.comments.push({ id: 1, body, createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" }); return success({ id: 1 }); },
     updateIssueComment: async (_repository, id, body) => { comments[id - 1] = body; issue.comments[id - 1] = { id, body, createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" }; return success({ id }); },
     findPullRequestByBranch: async () => success(null),
     createOrUpdateDraftPullRequest: async () => failure([]),
-    addPullRequestToProject: async () => success(undefined),
-    createCommitStatus: async () => success(undefined)
+    addPullRequestToProject: async () => success(undefined)
   };
   return { adapter, issue, statuses, comments, setProjectStatus(status: string) { projectStatus = status; } };
 }
@@ -128,10 +109,7 @@ function shapeDependencies(root: string, adapter: GitHubAdapter) {
   return {
     execute: executor(root),
     github: async () => success(adapter),
-    prompt: { confirm: async () => true },
-    planner: async () => failure<string>([]),
-    reviser: async () => success(undefined),
-    reviewer: async () => success({ annotations: false })
+    planner: async () => failure<string>([])
   };
 }
 
@@ -147,7 +125,7 @@ function executor(root: string) {
   };
 }
 
-const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { plansDirectory: "docs/plans/active" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1 }, review: { adapter: "revdiff" }, validation: { commands: ["pnpm check"] } };
+const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { plansDirectory: "docs/plans" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1, tasksOnly: false }, review: { adapter: "ralphex-codex", externalReviewTool: "none" }, validation: { commands: ["pnpm check"] } };
 const validPlan = `# Plan
 
 ## Goal

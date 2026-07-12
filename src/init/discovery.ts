@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { failure, success, type CommandResult } from "../contracts/result.js";
 import { runCommand, type CommandInvocation } from "../runner/command-runner.js";
 
-export const requiredTools = ["claude", "ralphex", "codex", "revdiff"] as const;
+export const requiredTools = ["claude", "ralphex", "codex"] as const;
 type DiscoveryExecutor = (invocation: CommandInvocation) => ReturnType<typeof runCommand>;
 
 export async function checkRequiredTools(cwd: string, execute: DiscoveryExecutor = runCommand): Promise<CommandResult<Record<string, string>>> {

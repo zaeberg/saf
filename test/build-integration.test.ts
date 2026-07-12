@@ -25,6 +25,7 @@ describe("saf build integration", () => {
     expect(github.prInputs[0]?.body).toContain("pnpm check");
     expect(github.projectAdds).toEqual(["PR_node"]);
     expect(harness.ralphex).toHaveBeenCalledOnce();
+    expect(harness.ralphex).toHaveBeenCalledWith(fixture.root, join(fixture.root, "docs/plans/42.md"), fixture.branch, { tasksOnly: false }, expect.any(Function));
     expect(harness.pushes()).toEqual([["push", "--set-upstream", "origin", fixture.branch]]);
     expect(parseMarkers(github.issue.comments, 42).run).toMatchObject({ state: "succeeded", pullRequest: 7, branch: fixture.branch });
     expect(github.issue.comments.at(-1)?.body).toContain("**SAF · Build run**");
@@ -79,6 +80,7 @@ describe("saf build integration", () => {
     const interrupted = await buildIssue({ issue: 42, dryRun: false, cwd: fixture.root }, harness.dependencies);
     expect(interrupted).toMatchObject({ ok: false, diagnostics: [{ code: "COMMAND_CANCELLED" }] });
     expect(parseMarkers(github.issue.comments, 42).run).toMatchObject({ state: "failed", failurePhase: "execution" });
+    await writeFile(join(fixture.root, "docs/plans/42.md"), plan.replace("- [ ] Implement.", "- [x] Implement."));
     const recovered = await buildIssue({ issue: 42, dryRun: false, cwd: fixture.root }, harness.dependencies);
     expect(recovered).toMatchObject({ ok: true, data: { state: "Review", pullRequest: 7 } });
     expect(harness.ralphex).toHaveBeenCalledTimes(2);
@@ -90,9 +92,11 @@ async function buildFixture() {
   const root = await mkdtemp(join(tmpdir(), "saf-build-"));
   await mkdir(join(root, ".git"));
   await mkdir(join(root, ".saf"));
+  await mkdir(join(root, "docs/plans"), { recursive: true });
   await writeFile(join(root, ".saf/config.yaml"), stringify(config));
+  await writeFile(join(root, "docs/plans/42.md"), plan);
   const sha = hashPlan(plan);
-  const approvedComment = serializeMarker({ version: 1, kind: "approved-plan", issue: 42, revision: 1, normalizationVersion: 1, sha256: sha, plan, planPath: "docs/plans/active/42.md" });
+  const approvedComment = serializeMarker({ version: 1, kind: "approved-plan", issue: 42, revision: 1, normalizationVersion: 1, sha256: sha, plan, planPath: "docs/plans/42.md" });
   return { root, sha, approvedComment, runId: `42-${sha.slice(0, 12)}`, branch: `saf/42-${sha.slice(0, 12)}` };
 }
 
@@ -111,14 +115,12 @@ function statefulAdapter(approved: string, run?: string, initialStatus = "Ready"
     getProjectItem: async () => success({ id: "item", status }),
     getPullRequest: async () => pullRequest ? success(pullRequest) : failure([{ code: "GITHUB_NOT_FOUND", severity: "error", message: "missing", remediation: "retry" }]),
     getChecks: async () => success({ state: "success", total: 1, failing: [] }),
-    getCommitStatus: async (_repository, sha) => success({ present: false, sha }),
     setProjectItemStatus: async (_project, _repository, _item, next) => { status = next; statuses.push(next); return success(undefined); },
     createIssueComment: async (_repository, _issue, body) => { const id = issue.comments.length + 1; issue.comments.push(comment(id, body)); return success({ id }); },
     updateIssueComment: async (_repository, id, body) => { const index = issue.comments.findIndex((item) => item.id === id); issue.comments[index] = comment(id, body); return success({ id }); },
     findPullRequestByBranch: async () => success(pullRequest),
-    createOrUpdateDraftPullRequest: async (_repository, input) => { prInputs.push(input); const created: PullRequestDetails = { number: 7, nodeId: "PR_node", state: "open", draft: true, merged: false, headSha: "b".repeat(40), branch: input.branch, url: "https://github.test/pr/7", comments: [] }; pullRequest = created; return success(created); },
-    addPullRequestToProject: async (_project, _repository, nodeId) => { projectAdds.push(nodeId); return success(undefined); },
-    createCommitStatus: async () => success(undefined)
+    createOrUpdateDraftPullRequest: async (_repository, input) => { prInputs.push(input); const created: PullRequestDetails = { number: 7, nodeId: "PR_node", state: "open", draft: true, merged: false, headSha: "b".repeat(40), branch: input.branch, url: "https://github.test/pr/7" }; pullRequest = created; return success(created); },
+    addPullRequestToProject: async (_project, _repository, nodeId) => { projectAdds.push(nodeId); return success(undefined); }
   };
   return { adapter, issue, statuses, prInputs, projectAdds };
 }
@@ -154,5 +156,5 @@ function dependencies(root: string, adapter: GitHubAdapter, failValidation = fal
 
 function comment(id: number, body: string) { return { id, body, createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" }; }
 
-const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { plansDirectory: "docs/plans/active" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1 }, review: { adapter: "revdiff" }, validation: { commands: ["pnpm check"] } };
-const plan = "# Plan\n\n## Goal\n\nImplement build.\n";
+const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { plansDirectory: "docs/plans" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1, tasksOnly: false }, review: { adapter: "ralphex-codex", externalReviewTool: "none" }, validation: { commands: ["pnpm check"] } };
+const plan = "# Plan\n\n## Overview\n\nImplement build.\n\n## Implementation Steps\n\n- [ ] Implement.\n\n## Solution Overview\n\nComplete.\n\n## Validation Commands\n\n```bash\npnpm check\n```\n";

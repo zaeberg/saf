@@ -14,7 +14,6 @@
 | Ralphex завершён, PR отсутствует | Повтор пропускает Ralphex и продолжает validation/push/PR | `test/build-integration.test.ts` recovery flow |
 | Run branch существует local, но не checkout | SAF безопасно переключается на неё | `test/build-git.test.ts` |
 | Run branch существует только remote | SAF выполняет fetch и создаёт tracking branch без force | `test/build-git.test.ts` |
-| После acceptance появился commit | Acceptance становится stale для нового SHA | `test/reducer.test.ts` |
 | Project Status изменён вручную | Derived state сохраняется, показывается drift | `test/reducer.test.ts` |
 | Marker comments конфликтуют | Workflow блокируется | `test/markers.test.ts`, `test/reducer.test.ts` |
 | Hidden envelope повреждён, visible summary сохранён | Visible текст остаётся читаемым, marker не принимается как evidence | `test/markers.test.ts` |
@@ -28,9 +27,9 @@
 | `status` | любое состояние | read-only, одинаковые facts дают одинаковый report | `test/status-integration.test.ts` |
 | `shape` | matching approved plan | один canonical comment, revision не растёт | `test/shape-integration.test.ts` |
 | `build` | Review либо execution-complete partial | no-op либо продолжение без duplicate Ralphex/PR/marker | `test/build-integration.test.ts` |
-| `review` | status уже существует для current SHA | no-op без revdiff/comment/status mutation | `test/review-integration.test.ts` |
+| `review` | open PR и original plan | повторно запускает Ralphex review без GitHub acceptance mutations | `test/review-integration.test.ts` |
 
-Marker presentation отдельно проверяется в `test/markers.test.ts`: approved plan содержит полный plan, run показывает lifecycle/branch/PR, acceptance показывает exact SHA; acceptance разных SHA сохраняется как история.
+Marker presentation отдельно проверяется в `test/markers.test.ts`: approved plan содержит полный plan, run показывает lifecycle/branch/PR.
 
 ## Security and scope audit
 
@@ -50,8 +49,7 @@ Evidence: `test/github-auth.test.ts`, `test/command-runner.test.ts`, `test/build
 1. Прервать `saf shape` после появления plan, затем восстановить через `saf shape <issue> --plan <path>`.
 2. Прервать Ralphex во время `saf build`, проверить failed run comment и повторить `saf build <issue>`.
 3. После успешного build удалить `.saf/runtime/` и проверить `saf status <issue>`.
-4. После acceptance добавить новый commit и убедиться, что `saf status` показывает stale acceptance.
-5. Временно установить неверный Project Status и проверить drift без потери evidence-derived state.
+4. Временно установить неверный Project Status и проверить drift без потери evidence-derived state.
 
 ## Pilot report
 

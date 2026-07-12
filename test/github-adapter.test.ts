@@ -59,21 +59,15 @@ describe("GitHubAdapter", () => {
     await expect(adapter.getProjectItem({ owner: "zbrg", number: 5 }, "zbrg/saf", 42)).resolves.toMatchObject({ ok: true, data: { id: "item", status: "Ready" } });
   });
 
-  it("reads PR, checks and the latest acceptance status", async () => {
+  it("reads PR and checks", async () => {
     const base = transport();
     const adapter = new DefaultGitHubAdapter({
       ...base,
       getPullRequest: async () => ({ number: 51, state: "open", draft: true, merged_at: null, html_url: "url", head: { sha: "a".repeat(40), ref: "feat/42" } }),
-      getIssueComments: async () => [],
-      getChecks: async () => ({ total_count: 2, check_runs: [{ name: "test", status: "completed", conclusion: "success" }, { name: "lint", status: "in_progress", conclusion: null }] }),
-      getCommitStatuses: async () => [
-        { sha: "a".repeat(40), context: "saf/human-acceptance", state: "failure" },
-        { sha: "a".repeat(40), context: "saf/human-acceptance", state: "success" }
-      ]
+      getChecks: async () => ({ total_count: 2, check_runs: [{ name: "test", status: "completed", conclusion: "success" }, { name: "lint", status: "in_progress", conclusion: null }] })
     });
-    await expect(adapter.getPullRequest("zbrg/saf", 51)).resolves.toMatchObject({ ok: true, data: { branch: "feat/42", comments: [] } });
+    await expect(adapter.getPullRequest("zbrg/saf", 51)).resolves.toMatchObject({ ok: true, data: { branch: "feat/42" } });
     await expect(adapter.getChecks("zbrg/saf", "a".repeat(40))).resolves.toMatchObject({ ok: true, data: { state: "pending", total: 2 } });
-    await expect(adapter.getCommitStatus("zbrg/saf", "a".repeat(40), "saf/human-acceptance")).resolves.toMatchObject({ ok: true, data: { present: false } });
   });
 
   it("updates Project Status and upserts Issue comments through typed mutations", async () => {
@@ -107,11 +101,12 @@ describe("GitHubAdapter", () => {
     expect(createPullRequest).not.toHaveBeenCalled();
   });
 
-  it("publishes commit status through the typed adapter", async () => {
-    const createCommitStatus = vi.fn(async () => ({}));
-    const adapter = new DefaultGitHubAdapter({ ...transport(), createCommitStatus });
-    await expect(adapter.createCommitStatus("zbrg/saf", "a".repeat(40), "saf/human-acceptance", "success", "Accepted")).resolves.toMatchObject({ ok: true });
-    expect(createCommitStatus).toHaveBeenCalledWith("zbrg", "saf", "a".repeat(40), "saf/human-acceptance", "success", "Accepted");
+  it("ignores Pull Request items while locating the Issue Project item", async () => {
+    const adapter = new DefaultGitHubAdapter({ ...transport(), getProjectItem: async () => ({ owner: { projectV2: { items: { nodes: [
+      { id: "issue-item", content: { __typename: "Issue", number: 42, repository: { nameWithOwner: "zbrg/saf" } }, fieldValueByName: { name: "Review" } },
+      { id: "pr-item", content: { __typename: "PullRequest", number: 42, repository: { nameWithOwner: "zbrg/saf" } }, fieldValueByName: { name: "Review" } }
+    ] } } } }) });
+    await expect(adapter.getProjectItem({ owner: "zbrg", number: 5 }, "zbrg/saf", 42)).resolves.toMatchObject({ ok: true, data: { id: "issue-item", status: "Review" } });
   });
 });
 
@@ -133,17 +128,14 @@ function transport(overrides: { repository?: string; fields?: unknown[]; error?:
     getIssueComments: async () => [],
     getProjectItem: async () => ({}),
     getPullRequest: async () => ({}),
-    getPullRequestFiles: async () => [],
     getChecks: async () => ({}),
-    getCommitStatuses: async () => [],
     updateProjectItemStatus: async () => ({}),
     createIssueComment: async () => ({ id: 1 }),
     updateIssueComment: async () => ({ id: 1 }),
     listPullRequests: async () => [],
     createPullRequest: async () => ({}),
     updatePullRequest: async () => ({}),
-    addProjectItem: async () => ({}),
-    createCommitStatus: async () => ({})
+    addProjectItem: async () => ({})
   };
 }
 

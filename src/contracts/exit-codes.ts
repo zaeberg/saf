@@ -35,18 +35,12 @@ const exitCodeByDiagnostic: Record<DiagnosticCode, ExitCode> = {
   PLAN_NOT_FOUND: ExitCode.InvalidUsage,
   PLAN_AMBIGUOUS: ExitCode.InvalidUsage,
   PLAN_INVALID: ExitCode.InvalidUsage,
-  PLAN_REVIEW_REQUIRED: ExitCode.InvalidUsage,
-  PLAN_APPROVAL_REQUIRED: ExitCode.InvalidUsage,
   BUILD_STATE_INVALID: ExitCode.InvalidUsage,
   WORKSPACE_DIRTY: ExitCode.InvalidUsage,
   ACTIVE_RUN_EXISTS: ExitCode.InvalidUsage,
   VALIDATION_FAILED: ExitCode.ExternalCommandFailed,
   BRANCH_INVALID: ExitCode.InvalidUsage,
   REVIEW_STATE_INVALID: ExitCode.InvalidUsage,
-  REVIEW_CI_BLOCKED: ExitCode.ExternalCommandFailed,
-  REVIEW_ANNOTATIONS_BLOCKING: ExitCode.InvalidUsage,
-  REVIEW_CONFIRMATION_MISMATCH: ExitCode.InvalidUsage,
-  REVIEW_HEAD_CHANGED: ExitCode.InvalidUsage,
   INVALID_ARGUMENT: ExitCode.InvalidUsage,
   INTERNAL_ERROR: ExitCode.InternalError
 };

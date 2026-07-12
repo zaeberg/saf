@@ -11,12 +11,12 @@ MVP должен автоматизировать уже проверенный 
 ```text
 GitHub Issue
 → интерактивные brainstorm и planning
-→ human review и approval точной revision плана
+→ planning:make со встроенным review плана
 → Ralphex + Codex
 → validation
 → Draft Pull Request
-→ CI и human code review
-→ human acceptance для точного commit SHA
+→ опциональный автоматический Ralphex review
+→ CI и human code review в GitHub
 → ручной merge
 ```
 
@@ -32,11 +32,10 @@ MVP считается полезным, если владелец может п
 
 - как передать planner контекст задачи и проекта;
 - где находится созданный plan;
-- был ли plan просмотрен и какая revision утверждена;
+- завершил ли planning:make подготовку плана;
 - с какими параметрами запускать Ralphex и Codex;
 - создан ли Draft Pull Request;
 - прошли ли validation и CI;
-- относится ли human acceptance к текущему SHA.
 
 CLI должен предотвращать небезопасный переход и объяснять, какое условие не выполнено.
 
@@ -76,7 +75,7 @@ Project передаётся явно как `<owner>/<number>`. CLI не пер
 6. Проверить доступ к явно указанному GitHub Project.
 7. Убедиться, что существующие Issue и Pull Request items Project принадлежат только текущему repository.
 8. Найти обязательное поле `Status` и его options.
-9. Проверить доступность Claude Code, Ralphex, Codex и revdiff.
+9. Проверить доступность Claude Code, Ralphex и Codex.
 10. Предложить найденные validation commands и потребовать подтверждение итогового набора.
 11. Создать tracked-файл `.saf/config.yaml`.
 12. Создать локальную директорию `.saf/runtime/`.
@@ -104,10 +103,10 @@ saf init --project zbrg/7 --rebind
 5. Запустить Claude Code + GLM для интерактивного brainstorm.
 6. Позволить человеку уточнить problem, desired outcome, non-goals и acceptance criteria.
 7. Запустить `/planning:make` и получить plan-файл.
-8. Проверить обязательную структуру плана.
-9. Открыть plan в revdiff и поддержать revision loop.
-10. После явного human approval нормализовать содержимое и вычислить SHA-256.
-11. Опубликовать полное содержимое approved plan, revision и hash в marker-комментарии GitHub Issue.
+8. Доверять встроенному review loop `planning:make` и не запускать второй review из SAF.
+9. Проверить минимальную обязательную структуру плана.
+10. Нормализовать содержимое и вычислить SHA-256.
+11. Опубликовать полное содержимое plan, revision, hash и original path в marker-комментарии GitHub Issue.
 12. Перевести Project item в `Ready` и вывести следующую команду.
 
 Brainstorm остаётся интерактивным. `saf` запускает planner с подготовленным контекстом, но не принимает продуктовые решения и не пытается автоматически завершить диалог вместо человека.
@@ -143,28 +142,16 @@ saf shape <issue> --plan <path>
 
 ### 3.4. `saf review <issue>`
 
-Команда проводит human review и публикует acceptance для точного SHA.
+Команда запускает отдельный автоматический review pipeline Ralphex. Human review и merge остаются в GitHub.
 
 Она должна:
 
-1. Найти связанный Draft Pull Request и его текущий head SHA.
-2. Проверить состояние CI.
-3. Сформировать минимальный review packet:
-   - Issue и desired outcome;
-   - acceptance criteria;
-   - approved plan revision и hash;
-   - изменённые области и файлы;
-   - результаты validation;
-   - manual verification steps;
-   - известные ограничения и scope deviations.
-4. Открыть diff в revdiff.
-5. Не публиковать acceptance при blocking annotations или неуспешном CI.
-6. Провести human acceptance checklist.
-7. Потребовать явное typed confirmation текущего SHA.
-8. Опубликовать commit status `saf/human-acceptance` для точного SHA.
-9. Добавить acceptance evidence в Pull Request.
-
-Любой новый commit делает предыдущий acceptance неприменимым и требует повторного review.
+1. Найти связанный open Pull Request, run branch и original plan.
+2. Восстановить local/remote-only branch.
+3. Запустить `ralphex --review --codex`.
+4. Поддержать `--review-model` и `--external-review-tool`.
+5. Выполнить configured validation и push branch без force.
+6. Не публиковать human acceptance markers или commit statuses.
 
 ### 3.5. `saf status <issue>`
 
@@ -181,8 +168,7 @@ Plan: r2, approved, hash matches
 Branch: feat/42-example
 Pull Request: #51, Draft
 CI: success
-Human acceptance: missing for current SHA
-Next action: saf review 42
+Next action: saf review 42 (optional), then review and merge in GitHub
 ```
 
 Команда должна обнаруживать как минимум:
@@ -190,7 +176,6 @@ Next action: saf review 42
 - отсутствующий или изменённый plan;
 - прерванный build;
 - существующую branch без Pull Request;
-- старый acceptance для предыдущего SHA;
 - конфликтующие или дублирующиеся marker-комментарии;
 - Project item из другого repository;
 - расхождение Project Status с проверяемыми GitHub/Git artifacts;
@@ -207,11 +192,10 @@ Next action: saf review 42
 | Реализация | Git branch |
 | Review boundary | Draft Pull Request |
 | Автоматическая проверка | CI checks |
-| Human acceptance | Commit status для текущего SHA |
 
-Локальные cache, logs, lock-файлы и временные review packets в `.saf/runtime/` допустимы, но их удаление не должно лишать CLI возможности определить состояние и продолжить задачу.
+Локальные cache, logs и lock-файлы в `.saf/runtime/` допустимы, но working plan всегда остаётся в original plans directory.
 
-GitHub Project является обязательным repository-scoped workflow UI, но его `Status` не является самостоятельным доказательством готовности. CLI выводит effective state из Issue, approved plan, Git, Pull Request, CI и human acceptance, сравнивает его с Project Status и сообщает о drift. Успешные команды обновляют Project Status только после выполнения transition guards.
+GitHub Project является обязательным repository-scoped workflow UI, но его `Status` не является самостоятельным доказательством готовности. CLI выводит effective state из Issue, plan marker, Git, Pull Request и CI, сравнивает его с Project Status и сообщает о drift.
 
 Один configured repository связан ровно с одним configured GitHub Project. Project должен содержать items только этого repository. CLI не перечисляет другие repositories или Projects пользователя и не проверяет глобально, привязан ли тот же repository к другой доске.
 
@@ -233,7 +217,7 @@ repository:
   defaultBranch: main
 
 documentation:
-  plansDirectory: docs/plans/active
+  plansDirectory: docs/plans
 
 planning:
   adapter: claude-glm
@@ -241,9 +225,11 @@ planning:
 execution:
   adapter: ralphex-codex
   maxConcurrentRuns: 1
+  tasksOnly: false
 
 review:
-  adapter: revdiff
+  adapter: ralphex-codex
+  externalReviewTool: none
 
 validation:
   commands:
@@ -276,9 +262,8 @@ CLI commands
 ├── planner adapter
 ├── plan parser and hash
 ├── Ralphex adapter
-├── revdiff adapter
 ├── state derivation
-└── review packet
+└── GitHub adapter
 ```
 
 Минимальные доменные сущности:
@@ -326,7 +311,7 @@ CLI commands
 - запуск Claude Code + GLM;
 - обнаружение созданного plan-файла;
 - plan lint;
-- revdiff review loop;
+- доверие review loop внутри `planning:make`;
 - нормализация и SHA-256;
 - marker-комментарий;
 - transitions Project Status `Shaping → Ready`;
@@ -347,18 +332,15 @@ CLI commands
 - transitions Project Status `Running → Review/Blocked`;
 - базовые состояния `Ready`, `Running`, `Review` и `Blocked`.
 
-### Итерация 3 — Draft PR → human acceptance
+### Итерация 3 — Automated review and GitHub handoff
 
-Результат: `saf review <issue>` создаёт review packet и принимает только текущий SHA.
+Результат: `saf review <issue>` запускает отдельный Ralphex review, после чего human review и merge выполняются в GitHub.
 
-- CI check summary;
-- review packet;
-- revdiff invocation и annotations;
-- human checklist;
-- typed SHA confirmation;
-- `saf/human-acceptance` status;
-- acceptance evidence comment;
-- инвалидация старого acceptance новым commit.
+- original plan и run branch;
+- `ralphex --review --codex`;
+- configurable review model;
+- configurable external review tool;
+- GitHub UI как human review boundary.
 
 ### Итерация 4 — Recovery and status
 
@@ -409,20 +391,19 @@ MVP готов к пилоту, если:
 5. CLI не перечисляет и не изменяет другие repositories или Projects пользователя.
 6. Items другого repository в configured Project обнаруживаются как configuration drift.
 7. `saf shape` создаёт plan из контекста Issue через интерактивный planner workflow.
-8. Plan невозможно утвердить без revdiff review и явного human confirmation.
+8. SAF доверяет завершённому `planning:make`, который отвечает за review плана.
 9. Approved revision публикуется полностью и имеет воспроизводимый SHA-256.
-10. Изменение plan после approval блокирует build.
+10. Изменение plan после завершённого shape блокирует новый build.
 11. `saf build` запускает Ralphex с Codex и создаёт ровно один Draft Pull Request.
 12. Повторный запуск основных команд не создаёт дублирующих marker-комментариев, branch или Pull Request.
 13. Неуспешные validation или execution переводят задачу и Project item в диагностируемое состояние `Blocked`.
-14. `saf review` не публикует acceptance при неуспешном CI или blocking annotations.
-15. Human acceptance относится к точному текущему SHA.
-16. Новый commit требует повторной приёмки.
-17. `saf status` показывает Project Status, derived state и drift без локальной постоянной базы.
-18. Удаление `.saf/runtime/` не приводит к потере approved plan или связи с Pull Request.
-19. Минимум одна искусственно прерванная задача успешно восстановлена.
-20. Через MVP проведены 3–5 реальных Standard-задач.
-21. Владелец подтверждает, что CLI уменьшает число ручных glue-действий и не делает workflow тяжелее ручного варианта.
+14. `saf review` запускает Ralphex review с выбранной моделью и external review mode.
+15. Human review и merge остаются в GitHub.
+16. `saf status` показывает Project Status, derived state и drift без локальной постоянной базы.
+17. Working plan остаётся в original plans directory и используется Ralphex напрямую.
+18. Минимум одна искусственно прерванная задача успешно восстановлена.
+19. Через MVP проведены 3–5 реальных Standard-задач.
+20. Владелец подтверждает, что CLI уменьшает число ручных glue-действий и не делает workflow тяжелее ручного варианта.
 
 ## 10. Последующие итерации
 

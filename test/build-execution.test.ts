@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { failure, success } from "../src/contracts/result.js";
 import type { CommandExecution, CommandInvocation } from "../src/runner/command-runner.js";
-import { runRalphex, runValidation } from "../src/build/execution.js";
+import { runRalphex, runRalphexReview, runValidation } from "../src/build/execution.js";
 
 describe("build execution", () => {
   it("passes the approved plan to Ralphex in native Codex mode", async () => {
     const execute = vi.fn(async (invocation: CommandInvocation) => ok(invocation));
-    const result = await runRalphex("/repo", "/repo/.saf/runtime/plan.md", "saf/42-abc", execute);
+    const result = await runRalphex("/repo", "/repo/docs/plans/plan.md", "saf/42-abc", { tasksOnly: true, taskModel: "gpt-5.4:high" }, execute);
     expect(result.ok).toBe(true);
     expect(execute).toHaveBeenCalledWith({
       command: "ralphex",
-      args: ["--codex", "--branch=saf/42-abc", "/repo/.saf/runtime/plan.md"],
+      args: ["--codex", "--branch=saf/42-abc", "--tasks-only", "--task-model=gpt-5.4:high", "/repo/docs/plans/plan.md"],
       cwd: "/repo",
       stdio: "inherit"
     });
@@ -40,8 +40,14 @@ describe("build execution", () => {
 
   it("preserves cancellation from Ralphex", async () => {
     const execute = vi.fn(async () => failure<CommandExecution>([{ code: "COMMAND_CANCELLED", severity: "error", message: "cancelled", remediation: "retry" }]));
-    const result = await runRalphex("/repo", "/repo/plan.md", "saf/42-abc", execute);
+    const result = await runRalphex("/repo", "/repo/plan.md", "saf/42-abc", { tasksOnly: false }, execute);
     expect(result).toMatchObject({ ok: false, diagnostics: [{ code: "COMMAND_CANCELLED" }] });
+  });
+
+  it("runs the standalone Ralphex review pipeline", async () => {
+    const execute = vi.fn(async (invocation: CommandInvocation) => ok(invocation));
+    await expect(runRalphexReview("/repo", "/repo/docs/plans/plan.md", { baseRef: "master", externalReviewTool: "none", reviewModel: "gpt-5.4:high" }, execute)).resolves.toMatchObject({ ok: true });
+    expect(execute).toHaveBeenCalledWith({ command: "ralphex", args: ["--review", "--codex", "--external-review-tool=none", "--base-ref=master", "--review-model=gpt-5.4:high", "/repo/docs/plans/plan.md"], cwd: "/repo", stdio: "inherit" });
   });
 });
 

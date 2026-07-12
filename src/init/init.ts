@@ -64,7 +64,7 @@ export async function initializeRepository(options: InitOptions, dependencies: I
 }
 
 function createConfig(repository: string, owner: string, number: number, defaultBranch: string, commands: string[]): SafConfigV1 {
-  return { version: 1, github: { repository, project: { owner, number } }, repository: { defaultBranch }, documentation: { plansDirectory: "docs/plans/active" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1 }, review: { adapter: "revdiff" }, validation: { commands } };
+  return { version: 1, github: { repository, project: { owner, number } }, repository: { defaultBranch }, documentation: { plansDirectory: "docs/plans" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1, tasksOnly: false }, review: { adapter: "ralphex-codex", externalReviewTool: "none" }, validation: { commands } };
 }
 
 function summary(repository: string, project: string, defaultBranch: string, validationCommands: string[], changed: boolean, dryRun: boolean): InitSummary {

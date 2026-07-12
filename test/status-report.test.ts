@@ -11,10 +11,9 @@ const report: StatusReport = {
   branch: "feat/42",
   pullRequest: { number: 51, state: "open", draft: true, merged: false, headSha: "b".repeat(40), url: "https://example.test/pr/51" },
   ci: "success",
-  humanAcceptance: { presentForCurrentSha: false, evidenceSha: null },
   findings: [],
   blockers: [],
-  nextAction: "saf review 42"
+  nextAction: "saf review 42 (optional), then review and merge in GitHub"
 };
 
 describe("status rendering", () => {
@@ -26,6 +25,6 @@ describe("status rendering", () => {
     const output = renderHumanStatus(success(report));
     expect(output).toContain("Project status: Review");
     expect(output).toContain("Derived state: Review");
-    expect(output).toContain("Next action: saf review 42");
+    expect(output).toContain("Next action: saf review 42 (optional), then review and merge in GitHub");
   });
 });
