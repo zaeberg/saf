@@ -12,6 +12,10 @@ export interface GitHubTransport {
   updateProjectItemStatus(projectId: string, itemId: string, fieldId: string, optionId: string): Promise<unknown>;
   createIssueComment(owner: string, repository: string, issue: number, body: string): Promise<unknown>;
   updateIssueComment(owner: string, repository: string, commentId: number, body: string): Promise<unknown>;
+  listPullRequests(owner: string, repository: string, branch: string): Promise<unknown[]>;
+  createPullRequest(owner: string, repository: string, input: { title: string; body: string; branch: string; base: string }): Promise<unknown>;
+  updatePullRequest(owner: string, repository: string, pullRequest: number, input: { title: string; body: string }): Promise<unknown>;
+  addProjectItem(projectId: string, contentId: string): Promise<unknown>;
 }
 
 const projectQuery = `query($owner:String!,$number:Int!,$cursor:String){
@@ -41,6 +45,7 @@ fragment ProjectItemData on ProjectV2Item {
 const updateProjectItemStatusMutation = `mutation($projectId:ID!,$itemId:ID!,$fieldId:ID!,$optionId:String!){
   updateProjectV2ItemFieldValue(input:{projectId:$projectId,itemId:$itemId,fieldId:$fieldId,value:{singleSelectOptionId:$optionId}}){projectV2Item{id}}
 }`;
+const addProjectItemMutation = `mutation($projectId:ID!,$contentId:ID!){addProjectV2ItemById(input:{projectId:$projectId,contentId:$contentId}){item{id}}}`;
 
 export class OctokitTransport implements GitHubTransport {
   readonly #client: Pick<Octokit, "rest" | "graphql" | "paginate">;
@@ -96,6 +101,22 @@ export class OctokitTransport implements GitHubTransport {
 
   async updateIssueComment(owner: string, repository: string, commentId: number, body: string): Promise<unknown> {
     return (await this.#client.rest.issues.updateComment({ owner, repo: repository, comment_id: commentId, body })).data;
+  }
+
+  async listPullRequests(owner: string, repository: string, branch: string): Promise<unknown[]> {
+    return this.#client.paginate(this.#client.rest.pulls.list, { owner, repo: repository, state: "all", head: `${owner}:${branch}`, per_page: 100 });
+  }
+
+  async createPullRequest(owner: string, repository: string, input: { title: string; body: string; branch: string; base: string }): Promise<unknown> {
+    return (await this.#client.rest.pulls.create({ owner, repo: repository, title: input.title, body: input.body, head: input.branch, base: input.base, draft: true })).data;
+  }
+
+  async updatePullRequest(owner: string, repository: string, pullRequest: number, input: { title: string; body: string }): Promise<unknown> {
+    return (await this.#client.rest.pulls.update({ owner, repo: repository, pull_number: pullRequest, title: input.title, body: input.body })).data;
+  }
+
+  async addProjectItem(projectId: string, contentId: string): Promise<unknown> {
+    return this.#client.graphql(addProjectItemMutation, { projectId, contentId });
   }
 }
 

@@ -83,6 +83,9 @@ async function fakeGitHubProvider() {
     getCommitStatus: async () => success({ present: false, sha: "a" }),
     setProjectItemStatus: async () => success(undefined),
     createIssueComment: async () => success({ id: 1 }),
-    updateIssueComment: async () => success({ id: 1 })
+    updateIssueComment: async () => success({ id: 1 }),
+    findPullRequestByBranch: async () => success(null),
+    createOrUpdateDraftPullRequest: async () => { throw new Error("unexpected mutation"); },
+    addPullRequestToProject: async () => success(undefined)
   });
 }

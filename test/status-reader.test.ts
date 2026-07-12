@@ -41,7 +41,10 @@ function adapter(issueMarkerBodies: string[], prMarkerBodies: string[] = []): Gi
     getCommitStatus: async (_repository, sha) => success({ present: false, sha }),
     setProjectItemStatus: async () => success(undefined),
     createIssueComment: async () => success({ id: 1 }),
-    updateIssueComment: async () => success({ id: 1 })
+    updateIssueComment: async () => success({ id: 1 }),
+    findPullRequestByBranch: async () => success(null),
+    createOrUpdateDraftPullRequest: async () => { throw new Error("unexpected mutation"); },
+    addPullRequestToProject: async () => success(undefined)
   };
 }
 

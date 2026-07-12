@@ -11,7 +11,8 @@ const approvedPlanSchema = z.object({
   revision: z.number().int().positive(),
   normalizationVersion: z.literal(1),
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
-  plan: z.string().min(1)
+  plan: z.string().min(1),
+  planPath: z.string().min(1).optional()
 });
 const runSchema = z.object({
   version: z.literal(1),
@@ -20,7 +21,12 @@ const runSchema = z.object({
   runId: z.string().min(1),
   state: z.enum(["started", "succeeded", "failed", "cancelled"]),
   branch: z.string().min(1),
-  pullRequest: z.number().int().positive().optional()
+  pullRequest: z.number().int().positive().optional(),
+  planRevision: z.number().int().positive().optional(),
+  planSha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  baseSha: z.string().min(7).optional(),
+  failurePhase: z.string().min(1).optional(),
+  completedAt: z.string().datetime().optional()
 });
 const acceptanceSchema = z.object({
   version: z.literal(1),
@@ -47,6 +53,7 @@ export interface ParsedMarkers {
   approvedPlanCommentIds?: number[];
   run?: RunMarker;
   runCommentId?: number;
+  runCommentIds?: number[];
   acceptance?: AcceptanceMarker;
   acceptanceCommentId?: number;
   findings: MarkerFinding[];
@@ -92,7 +99,11 @@ export function parseMarkers(comments: Array<{ id: number; body: string; updated
       approvedPlanCommentId: approvedEntries.find((entry) => JSON.stringify(entry.marker) === JSON.stringify(approvedPlan))!.commentId,
       approvedPlanCommentIds: approvedEntries.filter((entry) => JSON.stringify(entry.marker) === JSON.stringify(approvedPlan)).map((entry) => entry.commentId)
     } : {}),
-    ...(run ? { run, runCommentId: runEntries.find((entry) => JSON.stringify(entry.marker) === JSON.stringify(run))!.commentId } : {}),
+    ...(run ? {
+      run,
+      runCommentId: runEntries.find((entry) => JSON.stringify(entry.marker) === JSON.stringify(run))!.commentId,
+      runCommentIds: runEntries.filter((entry) => JSON.stringify(entry.marker) === JSON.stringify(run)).map((entry) => entry.commentId)
+    } : {}),
     ...(acceptance && acceptanceEntry ? { acceptance, acceptanceCommentId: acceptanceEntry.commentId } : {}),
     findings
   };
@@ -137,7 +148,9 @@ function renderMarkerSummary(marker: SafMarker): string {
         `- State: ${marker.state}`,
         `- Branch: \`${safeInline(marker.branch)}\``,
         `- Run: \`${safeInline(marker.runId)}\``,
-        ...(marker.pullRequest ? [`- Pull Request: #${marker.pullRequest}`] : [])
+        ...(marker.pullRequest ? [`- Pull Request: #${marker.pullRequest}`] : []),
+        ...(marker.planRevision ? [`- Plan: r${marker.planRevision}${marker.planSha256 ? ` (\`${marker.planSha256}\`)` : ""}`] : []),
+        ...(marker.failurePhase ? [`- Failed phase: ${safeInline(marker.failurePhase)}`] : [])
       ].join("\n");
     case "human-acceptance":
       return [

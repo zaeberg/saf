@@ -36,6 +36,11 @@ describe("workflow reducer", () => {
     const result = deriveState(facts({ markerFinding: "MARKER_CONFLICT" }));
     expect(result.state).toBe("Blocked");
   });
+
+  it("keeps a failed run Blocked when a Draft PR was already created", () => {
+    const result = deriveState(facts({ projectStatus: "Blocked", run: { ...run, state: "failed" }, pullRequest: pr() }));
+    expect(result.state).toBe("Blocked");
+  });
 });
 
 function facts(overrides: { projectStatus?: string; approvedPlan?: ApprovedPlanMarker; run?: RunMarker; pullRequest?: WorkflowFacts["pullRequest"]; issueState?: "open" | "closed"; acceptanceSha?: string; markerFinding?: "MARKER_CONFLICT" } = {}): WorkflowFacts {

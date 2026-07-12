@@ -17,6 +17,7 @@ const exitCodeByDiagnostic: Record<DiagnosticCode, ExitCode> = {
   CONFIG_INVALID: ExitCode.InvalidConfig,
   GIT_REPOSITORY_NOT_FOUND: ExitCode.PrerequisiteMissing,
   GITHUB_AUTH_MISSING: ExitCode.PrerequisiteMissing,
+  CODEX_AUTH_MISSING: ExitCode.PrerequisiteMissing,
   GITHUB_NOT_FOUND: ExitCode.PrerequisiteMissing,
   GITHUB_RATE_LIMITED: ExitCode.PrerequisiteMissing,
   GITHUB_RESPONSE_INVALID: ExitCode.ExternalCommandFailed,
@@ -36,6 +37,11 @@ const exitCodeByDiagnostic: Record<DiagnosticCode, ExitCode> = {
   PLAN_INVALID: ExitCode.InvalidUsage,
   PLAN_REVIEW_REQUIRED: ExitCode.InvalidUsage,
   PLAN_APPROVAL_REQUIRED: ExitCode.InvalidUsage,
+  BUILD_STATE_INVALID: ExitCode.InvalidUsage,
+  WORKSPACE_DIRTY: ExitCode.InvalidUsage,
+  ACTIVE_RUN_EXISTS: ExitCode.InvalidUsage,
+  VALIDATION_FAILED: ExitCode.ExternalCommandFailed,
+  BRANCH_INVALID: ExitCode.InvalidUsage,
   INVALID_ARGUMENT: ExitCode.InvalidUsage,
   INTERNAL_ERROR: ExitCode.InternalError
 };

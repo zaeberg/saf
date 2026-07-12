@@ -57,3 +57,14 @@ saf shape 42 --plan docs/plans/active/issue-42.md --dry-run
 ```
 
 SAF lints the plan, opens it in revdiff, requires explicit approval, publishes the shared human-readable `approved-plan` marker, and only then moves the Project item to `Ready`. Non-interactive approval requires the explicit `--yes` flag.
+
+## Building an approved plan
+
+Execute the exact approved plan through Ralphex + Codex and create or recover one Draft Pull Request:
+
+```bash
+saf build 42 --dry-run
+saf build 42
+```
+
+The command requires a clean workspace and an Issue in `Ready`, records a human-readable run marker, runs configured validation commands without a shell, and pushes only the generated feature branch without force. A successful run moves the Project item to `Review`; execution, validation, push or PR failures preserve recovery evidence and move it to `Blocked`.

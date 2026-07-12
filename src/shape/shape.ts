@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { loadConfig } from "../config/load.js";
 import { failure, success, type CommandResult } from "../contracts/result.js";
 import { inspectGitContext } from "../git/context.js";
@@ -97,7 +97,8 @@ export async function shapeIssue(options: ShapeOptions, dependencies: ShapeDepen
   if (!approved) return failure([{ code: "PLAN_APPROVAL_REQUIRED", severity: "error", message: "Plan was not explicitly approved.", remediation: "Review the plan and confirm approval." }]);
   plan = await loadAndLintPlan(planPath);
   if (!plan.ok) return plan;
-  const marker: ApprovedPlanMarker = { version: 1, kind: "approved-plan", issue: options.issue, revision, normalizationVersion: 1, sha256: hashPlan(plan.data.content), plan: plan.data.content };
+  const relativePlanPath = relative(git.data.root, planPath);
+  const marker: ApprovedPlanMarker = { version: 1, kind: "approved-plan", issue: options.issue, revision, normalizationVersion: 1, sha256: hashPlan(plan.data.content), plan: plan.data.content, ...(!relativePlanPath.startsWith("..") ? { planPath: relativePlanPath } : {}) };
   const markerBody = serializeMarker(marker);
   const parsed = parseMarkers(facts.data.issue.comments, options.issue);
   const existingCommentIds = parsed.approvedPlanCommentIds ?? [];

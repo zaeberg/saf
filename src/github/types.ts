@@ -37,7 +37,10 @@ export interface PullRequestDetails {
   branch: string;
   url: string;
   comments: Array<{ id: number; body: string; createdAt: string; updatedAt: string }>;
+  nodeId?: string;
 }
+
+export interface DraftPullRequestInput { title: string; body: string; branch: string; base: string; }
 
 export interface CheckDetails {
   state: "success" | "failure" | "pending" | "missing";
@@ -61,4 +64,7 @@ export interface GitHubAdapter {
   setProjectItemStatus(reference: ProjectReference, repository: string, projectItemId: string, status: string): Promise<CommandResult<void>>;
   createIssueComment(repository: string, issue: number, body: string): Promise<CommandResult<{ id: number }>>;
   updateIssueComment(repository: string, commentId: number, body: string): Promise<CommandResult<{ id: number }>>;
+  findPullRequestByBranch(repository: string, branch: string): Promise<CommandResult<PullRequestDetails | null>>;
+  createOrUpdateDraftPullRequest(repository: string, input: DraftPullRequestInput): Promise<CommandResult<PullRequestDetails>>;
+  addPullRequestToProject(reference: ProjectReference, repository: string, pullRequestNodeId: string): Promise<CommandResult<void>>;
 }

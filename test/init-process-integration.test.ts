@@ -60,5 +60,8 @@ const fakeAdapter: GitHubAdapter = {
   getCommitStatus: async () => ({ ok: true, data: { present: false, sha: "a" }, diagnostics: [] }),
   setProjectItemStatus: async () => ({ ok: true, data: undefined, diagnostics: [] }),
   createIssueComment: async () => ({ ok: true, data: { id: 1 }, diagnostics: [] }),
-  updateIssueComment: async () => ({ ok: true, data: { id: 1 }, diagnostics: [] })
+  updateIssueComment: async () => ({ ok: true, data: { id: 1 }, diagnostics: [] }),
+  findPullRequestByBranch: async () => ({ ok: true, data: null, diagnostics: [] }),
+  createOrUpdateDraftPullRequest: async () => ({ ok: false, diagnostics: [] }),
+  addPullRequestToProject: async () => ({ ok: true, data: undefined, diagnostics: [] })
 };

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { failure, success, type CommandResult } from "../contracts/result.js";
 import type { ProjectReference } from "../init/project-reference.js";
 import type { GitHubTransport } from "./transport.js";
-import { requiredProjectStatuses, type CheckDetails, type CommitStatusDetails, type GitHubAdapter, type IssueDetails, type ProjectDetails, type ProjectItemDetails, type PullRequestDetails, type RepositoryDetails } from "./types.js";
+import { requiredProjectStatuses, type CheckDetails, type CommitStatusDetails, type DraftPullRequestInput, type GitHubAdapter, type IssueDetails, type ProjectDetails, type ProjectItemDetails, type PullRequestDetails, type RepositoryDetails } from "./types.js";
 
 const repositorySchema = z.object({
   full_name: z.string(),
@@ -26,7 +26,7 @@ const projectItemSchema = z.object({ owner: z.object({ projectV2: z.object({ ite
   content: z.object({ number: z.number(), repository: z.object({ nameWithOwner: z.string() }) }).optional().nullable(),
   fieldValueByName: z.object({ name: z.string() }).optional().nullable()
 }).passthrough()) }) }).nullable() }).nullable() });
-const pullRequestSchema = z.object({ number: z.number(), state: z.enum(["open", "closed"]), draft: z.boolean(), merged_at: z.string().nullable(), html_url: z.string(), head: z.object({ sha: z.string(), ref: z.string() }) });
+const pullRequestSchema = z.object({ id: z.number().optional(), node_id: z.string().optional(), number: z.number(), state: z.enum(["open", "closed"]), draft: z.boolean(), merged_at: z.string().nullable(), html_url: z.string(), head: z.object({ sha: z.string(), ref: z.string() }) });
 const checksSchema = z.object({ total_count: z.number(), check_runs: z.array(z.object({ name: z.string(), status: z.string(), conclusion: z.string().nullable() })) });
 const statusSchema = z.object({ sha: z.string(), context: z.string(), state: z.string() });
 
@@ -122,7 +122,7 @@ export class DefaultGitHubAdapter implements GitHubAdapter {
       const parsed = pullRequestSchema.safeParse(pullRequestResponse);
       const comments = z.array(commentSchema).safeParse(commentsResponse);
       if (!parsed.success || !comments.success) return invalidResponse("Pull Request");
-      return success({ number: parsed.data.number, state: parsed.data.state, draft: parsed.data.draft, merged: parsed.data.merged_at !== null, headSha: parsed.data.head.sha, branch: parsed.data.head.ref, url: parsed.data.html_url, comments: comments.data.map((comment) => ({ id: comment.id, body: comment.body ?? "", createdAt: comment.created_at, updatedAt: comment.updated_at })) });
+      return success(toPullRequest(parsed.data, comments.data));
     } catch (error: unknown) {
       return githubFailure(error, `Pull Request ${repository}#${pullRequest}`);
     }
@@ -190,6 +190,44 @@ export class DefaultGitHubAdapter implements GitHubAdapter {
       return githubFailure(error, `Issue comment ${commentId}`);
     }
   }
+
+  async findPullRequestByBranch(repository: string, branch: string): Promise<CommandResult<PullRequestDetails | null>> {
+    const parts = splitRepository(repository);
+    if (!parts.ok) return parts;
+    try {
+      const parsed = z.array(pullRequestSchema).safeParse(await this.#transport.listPullRequests(parts.data.owner, parts.data.repository, branch));
+      if (!parsed.success) return invalidResponse("Pull Request list");
+      if (parsed.data.length > 1) return failure([{ code: "PROJECT_REPOSITORY_DRIFT", severity: "error", message: `Multiple Pull Requests use branch ${branch}.`, remediation: "Close duplicate Pull Requests before continuing." }]);
+      return success(parsed.data[0] ? toPullRequest(parsed.data[0], []) : null);
+    } catch (error: unknown) { return githubFailure(error, `Pull Request for branch ${branch}`); }
+  }
+
+  async createOrUpdateDraftPullRequest(repository: string, input: DraftPullRequestInput): Promise<CommandResult<PullRequestDetails>> {
+    const parts = splitRepository(repository);
+    if (!parts.ok) return parts;
+    const existing = await this.findPullRequestByBranch(repository, input.branch);
+    if (!existing.ok) return existing;
+    if (existing.data?.merged) return failure([{ code: "BUILD_STATE_INVALID", severity: "error", message: `Pull Request #${existing.data.number} is already merged.`, remediation: "Do not rebuild a merged workflow item." }]);
+    if (existing.data && !existing.data.draft) return failure([{ code: "BUILD_STATE_INVALID", severity: "error", message: `Pull Request #${existing.data.number} is not Draft.`, remediation: "Restore the PR to Draft or resolve it manually." }]);
+    try {
+      const raw = existing.data
+        ? await this.#transport.updatePullRequest(parts.data.owner, parts.data.repository, existing.data.number, { title: input.title, body: input.body })
+        : await this.#transport.createPullRequest(parts.data.owner, parts.data.repository, input);
+      const parsed = pullRequestSchema.safeParse(raw);
+      return parsed.success ? success(toPullRequest(parsed.data, [])) : invalidResponse("Pull Request");
+    } catch (error: unknown) { return githubFailure(error, `Draft Pull Request for ${input.branch}`); }
+  }
+
+  async addPullRequestToProject(reference: ProjectReference, repository: string, pullRequestNodeId: string): Promise<CommandResult<void>> {
+    const project = await this.getProject(reference, repository);
+    if (!project.ok) return project;
+    try { await this.#transport.addProjectItem(project.data.id, pullRequestNodeId); return success(undefined); }
+    catch (error: unknown) { return githubFailure(error, "adding Pull Request to Project"); }
+  }
+}
+
+function toPullRequest(parsed: z.infer<typeof pullRequestSchema>, comments: z.infer<typeof commentSchema>[]): PullRequestDetails {
+  return { number: parsed.number, state: parsed.state, draft: parsed.draft, merged: parsed.merged_at !== null, headSha: parsed.head.sha, branch: parsed.head.ref, url: parsed.html_url, comments: comments.map((comment) => ({ id: comment.id, body: comment.body ?? "", createdAt: comment.created_at, updatedAt: comment.updated_at })), ...(parsed.node_id ? { nodeId: parsed.node_id } : {}) };
 }
 
 function splitRepository(value: string): CommandResult<{ owner: string; repository: string }> {

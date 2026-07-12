@@ -11,6 +11,8 @@ import { shapeIssue } from "./shape/shape.js";
 import { revisePlan, runPlanner } from "./shape/planner.js";
 import { reviewPlan } from "./shape/review.js";
 import { writePlanningContext } from "./shape/context.js";
+import { buildIssue } from "./build/build.js";
+import { runRalphex, runValidation } from "./build/execution.js";
 
 export interface CliIo {
   stdout: (text: string) => void;
@@ -76,6 +78,17 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
       const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
       const confirm = io.confirm ?? (async () => false);
       const result = await shapeIssue({ issue: Number(issueValue), ...(options.plan ? { planPath: options.plan } : {}), dryRun: globals.dryRun === true, yes: options.yes, interactive: io.interactive === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, prompt: { confirm }, planner: runPlanner, reviser: revisePlan, reviewer: reviewPlan, context: writePlanningContext });
+      const rendered = renderResult(result, globals.json === true ? "json" : "human");
+      if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
+      commandExitCode = exitCodeFor(result.diagnostics);
+    });
+
+  program.command("build")
+    .description("execute an approved plan and create a Draft Pull Request")
+    .argument("<issue>", "positive GitHub Issue number")
+    .action(async (issueValue: string, _options: unknown, command: Command) => {
+      const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
+      const result = await buildIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphex, validation: runValidation });
       const rendered = renderResult(result, globals.json === true ? "json" : "human");
       if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
       commandExitCode = exitCodeFor(result.diagnostics);

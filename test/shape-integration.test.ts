@@ -111,7 +111,10 @@ function statefulAdapter(): { adapter: GitHubAdapter; issue: IssueDetails; statu
     getCommitStatus: async () => failure([]),
     setProjectItemStatus: async (_reference, _repository, _item, status) => { projectStatus = status; statuses.push(status); return success(undefined); },
     createIssueComment: async (_repository, _issue, body) => { comments.push(body); issue.comments.push({ id: 1, body, createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" }); return success({ id: 1 }); },
-    updateIssueComment: async (_repository, id, body) => { comments[id - 1] = body; issue.comments[id - 1] = { id, body, createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" }; return success({ id }); }
+    updateIssueComment: async (_repository, id, body) => { comments[id - 1] = body; issue.comments[id - 1] = { id, body, createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" }; return success({ id }); },
+    findPullRequestByBranch: async () => success(null),
+    createOrUpdateDraftPullRequest: async () => failure([]),
+    addPullRequestToProject: async () => success(undefined)
   };
   return { adapter, issue, statuses, comments };
 }

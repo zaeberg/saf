@@ -33,7 +33,10 @@ const adapter: GitHubAdapter = {
   getCommitStatus: async () => { throw new Error("unexpected status read"); },
   setProjectItemStatus: async () => { throw new Error("unexpected mutation"); },
   createIssueComment: async () => { throw new Error("unexpected mutation"); },
-  updateIssueComment: async () => { throw new Error("unexpected mutation"); }
+  updateIssueComment: async () => { throw new Error("unexpected mutation"); },
+  findPullRequestByBranch: async () => { throw new Error("unexpected read"); },
+  createOrUpdateDraftPullRequest: async () => { throw new Error("unexpected mutation"); },
+  addPullRequestToProject: async () => { throw new Error("unexpected mutation"); }
 };
 
 function executor(root: string) {

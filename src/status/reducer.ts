@@ -51,9 +51,9 @@ function derivePrimaryState(facts: WorkflowFacts, findings: DriftFinding[]): Der
   if (facts.pullRequest?.merged) return "Done";
   if (facts.issue.state === "closed" && !facts.pullRequest) return "Cancelled";
   if (facts.pullRequest?.state === "closed") return "Blocked";
-  if (facts.pullRequest) return "Review";
   if (facts.run?.state === "failed") return "Blocked";
   if (facts.run?.state === "cancelled") return "Cancelled";
+  if (facts.pullRequest) return "Review";
   if (facts.run) return "Running";
   if (facts.approvedPlan) return "Ready";
   if (facts.projectItem.status === "Shaping") return "Shaping";

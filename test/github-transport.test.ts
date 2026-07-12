@@ -36,4 +36,18 @@ describe("OctokitTransport", () => {
     await expect(transport.createIssueComment("zbrg", "saf", 42, "body")).resolves.toEqual({ id: 11 });
     await expect(transport.updateIssueComment("zbrg", "saf", 11, "changed")).resolves.toEqual({ id: 11 });
   });
+
+  it("uses Draft PR REST mutations and the Project item GraphQL mutation", async () => {
+    const create = vi.fn(async () => ({ data: { number: 7 } }));
+    const update = vi.fn(async () => ({ data: { number: 7 } }));
+    const graphql = Object.assign(vi.fn(async () => ({ item: { id: "item" } })), { paginate: vi.fn() });
+    const client = { rest: { pulls: { create, update } }, graphql, paginate: vi.fn() } as unknown as Pick<Octokit, "rest" | "graphql" | "paginate">;
+    const transport = new OctokitTransport(client);
+    await transport.createPullRequest("zbrg", "saf", { title: "Build", body: "Evidence", branch: "saf/42", base: "master" });
+    expect(create).toHaveBeenCalledWith({ owner: "zbrg", repo: "saf", title: "Build", body: "Evidence", head: "saf/42", base: "master", draft: true });
+    await transport.updatePullRequest("zbrg", "saf", 7, { title: "Build", body: "Updated" });
+    expect(update).toHaveBeenCalledWith({ owner: "zbrg", repo: "saf", pull_number: 7, title: "Build", body: "Updated" });
+    await transport.addProjectItem("project", "PR_node");
+    expect(graphql).toHaveBeenCalledWith(expect.stringContaining("addProjectV2ItemById"), { projectId: "project", contentId: "PR_node" });
+  });
 });

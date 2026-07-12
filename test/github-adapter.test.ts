@@ -86,7 +86,31 @@ describe("GitHubAdapter", () => {
     await expect(adapter.createIssueComment("zbrg/saf", 42, "body")).resolves.toMatchObject({ ok: true, data: { id: 11 } });
     await expect(adapter.updateIssueComment("zbrg/saf", 11, "changed")).resolves.toMatchObject({ ok: true, data: { id: 11 } });
   });
+
+  it("creates one Draft PR for a branch and adds it to the Project", async () => {
+    const createPullRequest = vi.fn(async () => pullRequestResponse());
+    const addProjectItem = vi.fn(async () => ({}));
+    const adapter = new DefaultGitHubAdapter({ ...transport(), createPullRequest, addProjectItem });
+    const result = await adapter.createOrUpdateDraftPullRequest("zbrg/saf", { title: "Build", body: "Evidence", branch: "saf/42", base: "master" });
+    expect(result).toMatchObject({ ok: true, data: { number: 7, draft: true, nodeId: "PR_node" } });
+    expect(createPullRequest).toHaveBeenCalledOnce();
+    await expect(adapter.addPullRequestToProject({ owner: "zbrg", number: 5 }, "zbrg/saf", "PR_node")).resolves.toMatchObject({ ok: true });
+    expect(addProjectItem).toHaveBeenCalledWith("PVT_1", "PR_node");
+  });
+
+  it("updates the existing Draft PR instead of creating a duplicate", async () => {
+    const updatePullRequest = vi.fn(async () => pullRequestResponse());
+    const createPullRequest = vi.fn(async () => pullRequestResponse());
+    const adapter = new DefaultGitHubAdapter({ ...transport(), listPullRequests: async () => [pullRequestResponse()], updatePullRequest, createPullRequest });
+    await expect(adapter.createOrUpdateDraftPullRequest("zbrg/saf", { title: "Build", body: "Evidence", branch: "saf/42", base: "master" })).resolves.toMatchObject({ ok: true });
+    expect(updatePullRequest).toHaveBeenCalledWith("zbrg", "saf", 7, { title: "Build", body: "Evidence" });
+    expect(createPullRequest).not.toHaveBeenCalled();
+  });
 });
+
+function pullRequestResponse() {
+  return { number: 7, node_id: "PR_node", state: "open", draft: true, merged_at: null, html_url: "url", head: { sha: "a".repeat(40), ref: "saf/42" } };
+}
 
 function transport(overrides: { repository?: string; fields?: unknown[]; error?: Error; repositoryResponse?: unknown } = {}): GitHubTransport {
   return {
@@ -106,7 +130,11 @@ function transport(overrides: { repository?: string; fields?: unknown[]; error?:
     getCommitStatuses: async () => [],
     updateProjectItemStatus: async () => ({}),
     createIssueComment: async () => ({ id: 1 }),
-    updateIssueComment: async () => ({ id: 1 })
+    updateIssueComment: async () => ({ id: 1 }),
+    listPullRequests: async () => [],
+    createPullRequest: async () => ({}),
+    updatePullRequest: async () => ({}),
+    addProjectItem: async () => ({})
   };
 }
 
