@@ -19,3 +19,9 @@ Official name - SAF
 CLI command - saf
 
 Project specification and idea described in /docs/local-agent-workflow-epic-spec.md
+
+Ты делаешь mvp нового CLI.
+
+Основная документация того что мы сейчас делаем и что должно получиться лежит в docs/saf-mvp.md
+
+Ты можешь создать новую ветку от мастера, ты можешь коммиттить атомарные логичные куски работы, но пушить ветку в основной репозиторий запрещается
