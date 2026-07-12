@@ -44,7 +44,8 @@ function adapter(issueMarkerBodies: string[], prMarkerBodies: string[] = []): Gi
     updateIssueComment: async () => success({ id: 1 }),
     findPullRequestByBranch: async () => success(null),
     createOrUpdateDraftPullRequest: async () => { throw new Error("unexpected mutation"); },
-    addPullRequestToProject: async () => success(undefined)
+    addPullRequestToProject: async () => success(undefined),
+    createCommitStatus: async () => success(undefined)
   };
 }
 

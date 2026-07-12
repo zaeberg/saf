@@ -68,3 +68,15 @@ saf build 42
 ```
 
 The command requires a clean workspace and an Issue in `Ready`, records a human-readable run marker, runs configured validation commands without a shell, and pushes only the generated feature branch without force. A successful run moves the Project item to `Review`; execution, validation, push or PR failures preserve recovery evidence and move it to `Blocked`.
+
+## Human review and acceptance
+
+Review the current Draft Pull Request and bind human acceptance to its exact head SHA:
+
+```bash
+saf review 42 --dry-run
+saf review 42
+saf review 42 --sha <full-head-sha>
+```
+
+SAF requires successful CI, writes a temporary review packet under `.saf/runtime/review/`, and opens the current diff in revdiff. Prefix annotations with `[non-blocking]` when they do not prevent acceptance; `[blocking]` and unprefixed annotations block it. Immediately before publishing, SAF reads the PR head again, then creates the human-readable acceptance comment and `saf/human-acceptance` commit status for that exact SHA. SAF never merges or marks the Project item `Done`.

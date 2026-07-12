@@ -114,7 +114,8 @@ function statefulAdapter(): { adapter: GitHubAdapter; issue: IssueDetails; statu
     updateIssueComment: async (_repository, id, body) => { comments[id - 1] = body; issue.comments[id - 1] = { id, body, createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" }; return success({ id }); },
     findPullRequestByBranch: async () => success(null),
     createOrUpdateDraftPullRequest: async () => failure([]),
-    addPullRequestToProject: async () => success(undefined)
+    addPullRequestToProject: async () => success(undefined),
+    createCommitStatus: async () => success(undefined)
   };
   return { adapter, issue, statuses, comments };
 }

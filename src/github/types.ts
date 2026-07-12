@@ -30,6 +30,8 @@ export interface ProjectItemDetails {
 
 export interface PullRequestDetails {
   number: number;
+  title?: string;
+  body?: string;
   state: "open" | "closed";
   draft: boolean;
   merged: boolean;
@@ -38,6 +40,7 @@ export interface PullRequestDetails {
   url: string;
   comments: Array<{ id: number; body: string; createdAt: string; updatedAt: string }>;
   nodeId?: string;
+  changedFiles?: string[];
 }
 
 export interface DraftPullRequestInput { title: string; body: string; branch: string; base: string; }
@@ -67,4 +70,5 @@ export interface GitHubAdapter {
   findPullRequestByBranch(repository: string, branch: string): Promise<CommandResult<PullRequestDetails | null>>;
   createOrUpdateDraftPullRequest(repository: string, input: DraftPullRequestInput): Promise<CommandResult<PullRequestDetails>>;
   addPullRequestToProject(reference: ProjectReference, repository: string, pullRequestNodeId: string): Promise<CommandResult<void>>;
+  createCommitStatus(repository: string, sha: string, context: string, state: "pending" | "success" | "failure" | "error", description: string): Promise<CommandResult<void>>;
 }

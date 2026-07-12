@@ -42,6 +42,11 @@ const exitCodeByDiagnostic: Record<DiagnosticCode, ExitCode> = {
   ACTIVE_RUN_EXISTS: ExitCode.InvalidUsage,
   VALIDATION_FAILED: ExitCode.ExternalCommandFailed,
   BRANCH_INVALID: ExitCode.InvalidUsage,
+  REVIEW_STATE_INVALID: ExitCode.InvalidUsage,
+  REVIEW_CI_BLOCKED: ExitCode.ExternalCommandFailed,
+  REVIEW_ANNOTATIONS_BLOCKING: ExitCode.InvalidUsage,
+  REVIEW_CONFIRMATION_MISMATCH: ExitCode.InvalidUsage,
+  REVIEW_HEAD_CHANGED: ExitCode.InvalidUsage,
   INVALID_ARGUMENT: ExitCode.InvalidUsage,
   INTERNAL_ERROR: ExitCode.InternalError
 };

@@ -102,8 +102,9 @@ function statefulAdapter(approved: string, run?: string, initialStatus = "Ready"
     createIssueComment: async (_repository, _issue, body) => { const id = issue.comments.length + 1; issue.comments.push(comment(id, body)); return success({ id }); },
     updateIssueComment: async (_repository, id, body) => { const index = issue.comments.findIndex((item) => item.id === id); issue.comments[index] = comment(id, body); return success({ id }); },
     findPullRequestByBranch: async () => success(pullRequest),
-    createOrUpdateDraftPullRequest: async (_repository, input) => { prInputs.push(input); pullRequest = { number: 7, nodeId: "PR_node", state: "open", draft: true, merged: false, headSha: "b".repeat(40), branch: input.branch, url: "https://github.test/pr/7", comments: [] }; return success(pullRequest); },
-    addPullRequestToProject: async (_project, _repository, nodeId) => { projectAdds.push(nodeId); return success(undefined); }
+    createOrUpdateDraftPullRequest: async (_repository, input) => { prInputs.push(input); const created: PullRequestDetails = { number: 7, nodeId: "PR_node", state: "open", draft: true, merged: false, headSha: "b".repeat(40), branch: input.branch, url: "https://github.test/pr/7", comments: [] }; pullRequest = created; return success(created); },
+    addPullRequestToProject: async (_project, _repository, nodeId) => { projectAdds.push(nodeId); return success(undefined); },
+    createCommitStatus: async () => success(undefined)
   };
   return { adapter, issue, statuses, prInputs, projectAdds };
 }

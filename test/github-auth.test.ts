@@ -17,7 +17,8 @@ const fakeAdapter: GitHubAdapter = {
   updateIssueComment: async () => failure([]),
   findPullRequestByBranch: async () => failure([]),
   createOrUpdateDraftPullRequest: async () => failure([]),
-  addPullRequestToProject: async () => failure([])
+  addPullRequestToProject: async () => failure([]),
+  createCommitStatus: async () => failure([])
 };
 
 describe("GitHub credential boundary", () => {

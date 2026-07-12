@@ -50,4 +50,15 @@ describe("OctokitTransport", () => {
     await transport.addProjectItem("project", "PR_node");
     expect(graphql).toHaveBeenCalledWith(expect.stringContaining("addProjectV2ItemById"), { projectId: "project", contentId: "PR_node" });
   });
+
+  it("reads changed files and publishes an exact-SHA commit status", async () => {
+    const listFiles = vi.fn();
+    const createCommitStatus = vi.fn(async () => ({ data: { id: 1 } }));
+    const paginate = vi.fn(async (method, input) => { expect(method).toBe(listFiles); expect(input).toMatchObject({ pull_number: 7, per_page: 100 }); return [{ filename: "src/review.ts" }]; });
+    const client = { rest: { pulls: { listFiles }, repos: { createCommitStatus } }, graphql: Object.assign(vi.fn(), { paginate: vi.fn() }), paginate } as unknown as Pick<Octokit, "rest" | "graphql" | "paginate">;
+    const transport = new OctokitTransport(client);
+    await expect(transport.getPullRequestFiles("zbrg", "saf", 7)).resolves.toEqual([{ filename: "src/review.ts" }]);
+    await transport.createCommitStatus("zbrg", "saf", "a".repeat(40), "saf/human-acceptance", "success", "Accepted");
+    expect(createCommitStatus).toHaveBeenCalledWith({ owner: "zbrg", repo: "saf", sha: "a".repeat(40), context: "saf/human-acceptance", state: "success", description: "Accepted" });
+  });
 });

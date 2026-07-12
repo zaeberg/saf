@@ -106,6 +106,13 @@ describe("GitHubAdapter", () => {
     expect(updatePullRequest).toHaveBeenCalledWith("zbrg", "saf", 7, { title: "Build", body: "Evidence" });
     expect(createPullRequest).not.toHaveBeenCalled();
   });
+
+  it("publishes commit status through the typed adapter", async () => {
+    const createCommitStatus = vi.fn(async () => ({}));
+    const adapter = new DefaultGitHubAdapter({ ...transport(), createCommitStatus });
+    await expect(adapter.createCommitStatus("zbrg/saf", "a".repeat(40), "saf/human-acceptance", "success", "Accepted")).resolves.toMatchObject({ ok: true });
+    expect(createCommitStatus).toHaveBeenCalledWith("zbrg", "saf", "a".repeat(40), "saf/human-acceptance", "success", "Accepted");
+  });
 });
 
 function pullRequestResponse() {
@@ -126,6 +133,7 @@ function transport(overrides: { repository?: string; fields?: unknown[]; error?:
     getIssueComments: async () => [],
     getProjectItem: async () => ({}),
     getPullRequest: async () => ({}),
+    getPullRequestFiles: async () => [],
     getChecks: async () => ({}),
     getCommitStatuses: async () => [],
     updateProjectItemStatus: async () => ({}),
@@ -134,7 +142,8 @@ function transport(overrides: { repository?: string; fields?: unknown[]; error?:
     listPullRequests: async () => [],
     createPullRequest: async () => ({}),
     updatePullRequest: async () => ({}),
-    addProjectItem: async () => ({})
+    addProjectItem: async () => ({}),
+    createCommitStatus: async () => ({})
   };
 }
 

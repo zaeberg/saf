@@ -13,11 +13,15 @@ import { reviewPlan } from "./shape/review.js";
 import { writePlanningContext } from "./shape/context.js";
 import { buildIssue } from "./build/build.js";
 import { runRalphex, runValidation } from "./build/execution.js";
+import { reviewIssue } from "./review/review.js";
+import { reviewDiff } from "./review/revdiff.js";
+import { writeReviewPacket } from "./review/packet.js";
 
 export interface CliIo {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
   confirm?: (message: string) => Promise<boolean>;
+  input?: (message: string) => Promise<string>;
   cwd?: string;
   interactive?: boolean;
 }
@@ -89,6 +93,18 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
     .action(async (issueValue: string, _options: unknown, command: Command) => {
       const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
       const result = await buildIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, ralphex: runRalphex, validation: runValidation });
+      const rendered = renderResult(result, globals.json === true ? "json" : "human");
+      if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
+      commandExitCode = exitCodeFor(result.diagnostics);
+    });
+
+  program.command("review")
+    .description("review a Draft Pull Request and accept its exact head SHA")
+    .argument("<issue>", "positive GitHub Issue number")
+    .option("--sha <sha>", "explicit current head SHA for non-interactive acceptance")
+    .action(async (issueValue: string, options: { sha?: string }, command: Command) => {
+      const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
+      const result = await reviewIssue({ issue: Number(issueValue), dryRun: globals.dryRun === true, ...(options.sha ? { confirmationSha: options.sha } : {}), interactive: io.interactive === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, prompt: { input: io.input ?? (async () => "") }, reviewer: reviewDiff, writePacket: writeReviewPacket });
       const rendered = renderResult(result, globals.json === true ? "json" : "human");
       if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
       commandExitCode = exitCodeFor(result.diagnostics);

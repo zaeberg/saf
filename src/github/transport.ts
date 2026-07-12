@@ -16,6 +16,8 @@ export interface GitHubTransport {
   createPullRequest(owner: string, repository: string, input: { title: string; body: string; branch: string; base: string }): Promise<unknown>;
   updatePullRequest(owner: string, repository: string, pullRequest: number, input: { title: string; body: string }): Promise<unknown>;
   addProjectItem(projectId: string, contentId: string): Promise<unknown>;
+  getPullRequestFiles(owner: string, repository: string, pullRequest: number): Promise<unknown[]>;
+  createCommitStatus(owner: string, repository: string, sha: string, context: string, state: "pending" | "success" | "failure" | "error", description: string): Promise<unknown>;
 }
 
 const projectQuery = `query($owner:String!,$number:Int!,$cursor:String){
@@ -82,6 +84,10 @@ export class OctokitTransport implements GitHubTransport {
     return (await this.#client.rest.pulls.get({ owner, repo: repository, pull_number: pullRequest })).data;
   }
 
+  async getPullRequestFiles(owner: string, repository: string, pullRequest: number): Promise<unknown[]> {
+    return this.#client.paginate(this.#client.rest.pulls.listFiles, { owner, repo: repository, pull_number: pullRequest, per_page: 100 });
+  }
+
   async getChecks(owner: string, repository: string, sha: string): Promise<unknown> {
     const checkRuns = await this.#client.paginate(this.#client.rest.checks.listForRef, { owner, repo: repository, ref: sha, per_page: 100 });
     return { total_count: checkRuns.length, check_runs: checkRuns };
@@ -117,6 +123,10 @@ export class OctokitTransport implements GitHubTransport {
 
   async addProjectItem(projectId: string, contentId: string): Promise<unknown> {
     return this.#client.graphql(addProjectItemMutation, { projectId, contentId });
+  }
+
+  async createCommitStatus(owner: string, repository: string, sha: string, context: string, state: "pending" | "success" | "failure" | "error", description: string): Promise<unknown> {
+    return (await this.#client.rest.repos.createCommitStatus({ owner, repo: repository, sha, context, state, description })).data;
   }
 }
 
