@@ -1,5 +1,4 @@
-import { spawn } from "node:child_process";
-import { once } from "node:events";
+import { execa, type Options as ExecaOptions } from "execa";
 import { failure, success, type CommandResult } from "../contracts/result.js";
 import { redact, redactArgv } from "./redact.js";
 
@@ -37,43 +36,38 @@ export async function runCommand(invocation: CommandInvocation): Promise<Command
   if (isAborted(signal)) return cancelled(safeCommand, safeArgs);
 
   try {
-    const child = spawn(invocation.command, args, {
-      cwd: invocation.cwd,
-      env: invocation.env,
+    const options = {
+      extendEnv: invocation.env === undefined,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
-    });
-    let rawStdout = "";
-    let rawStderr = "";
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+      reject: false,
+      stripFinalNewline: false,
+      ...(invocation.cwd === undefined ? {} : { cwd: invocation.cwd }),
+      ...(invocation.env === undefined ? {} : { env: invocation.env }),
+      ...(signal === undefined ? {} : { cancelSignal: signal })
+    } as const satisfies ExecaOptions;
+    const child = execa(invocation.command, args, options);
     const stdoutStream = createSafeStream(secrets, invocation.onStdout);
     const stderrStream = createSafeStream(secrets, invocation.onStderr);
-    child.stdout.on("data", (buffer: Buffer) => {
-      const chunk = buffer.toString();
-      rawStdout += chunk;
-      stdoutStream.write(chunk);
+    child.stdout?.on("data", (buffer: Buffer) => {
+      stdoutStream.write(buffer.toString());
     });
-    child.stderr.on("data", (buffer: Buffer) => {
-      const chunk = buffer.toString();
-      rawStderr += chunk;
-      stderrStream.write(chunk);
+    child.stderr?.on("data", (buffer: Buffer) => {
+      stderrStream.write(buffer.toString());
     });
-    const stdoutEnded = once(child.stdout, "end");
-    const stderrEnded = once(child.stderr, "end");
-    const abort = (): void => { child.kill("SIGTERM"); };
-    signal?.addEventListener("abort", abort, { once: true });
-    const [closeEvent] = await Promise.all([once(child, "close"), stdoutEnded, stderrEnded]);
-    const [exitCode] = closeEvent as [number | null, NodeJS.Signals | null];
+    const result = await child;
     stdoutStream.end();
     stderrStream.end();
-    signal?.removeEventListener("abort", abort);
 
-    if (isAborted(signal)) return cancelled(safeCommand, safeArgs);
+    if (result.isCanceled || isAborted(signal)) return cancelled(safeCommand, safeArgs);
     const execution = {
       command: safeCommand,
       args: safeArgs,
-      exitCode: exitCode ?? 1,
-      stdout: redact(rawStdout, secrets),
-      stderr: redact(rawStderr, secrets),
+      exitCode: result.exitCode ?? 1,
+      stdout: redact(typeof result.stdout === "string" ? result.stdout : "", secrets),
+      stderr: redact(typeof result.stderr === "string" ? result.stderr : "", secrets),
       dryRun: false
     };
     if (execution.exitCode !== 0) {
@@ -82,7 +76,7 @@ export async function runCommand(invocation: CommandInvocation): Promise<Command
     return success(execution);
   } catch (error: unknown) {
     const message = redact(error instanceof Error ? error.message : "Unable to start command", secrets);
-    const notFound = isNodeError(error) && error.code === "ENOENT";
+    const notFound = isErrorWithCode(error) && error.code === "ENOENT";
     return failure([{
       code: notFound ? "TOOL_NOT_FOUND" : "COMMAND_FAILED",
       severity: "error",
@@ -96,8 +90,8 @@ function cancelled(command: string, args: string[]): CommandResult<CommandExecut
   return failure([{ code: "COMMAND_CANCELLED", severity: "error", message: `Command cancelled: ${[command, ...args].join(" ")}`, remediation: "Retry the command when ready." }]);
 }
 
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
+function isErrorWithCode(error: unknown): error is Error & { code: string } {
+  return error instanceof Error && "code" in error && typeof error.code === "string";
 }
 
 function isAborted(signal: AbortSignal | undefined): boolean {

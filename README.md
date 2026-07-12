@@ -4,7 +4,7 @@ Opinionated local CLI for a safe coding-agent workflow. The first implementation
 
 ## Development
 
-Requirements: Node.js 22 or newer and pnpm 10.
+Requirements: Node.js 22.13 or newer and pnpm 10.
 
 ```bash
 pnpm install
