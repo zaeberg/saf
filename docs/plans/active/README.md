@@ -6,9 +6,10 @@
 
 | План | Результат | Зависит от |
 |---|---|---|
-| [SAF-001](./saf-001-cli-foundation.md) | Исполняемый CLI и базовые контракты | — |
-| [SAF-002](./saf-002-init.md) | Repository привязан к одному GitHub Project | SAF-001 |
-| [SAF-003](./saf-003-status.md) | Stateless state derivation и `saf status` | SAF-002 |
+| [SAF-001](../done/saf-001-cli-foundation.md) | Исполняемый CLI и базовые контракты | — |
+| [SAF-002](../done/saf-002-init.md) | Repository привязан к одному GitHub Project | SAF-001 |
+| [SAF-002A](./saf-002a-github-transport.md) | Единый Octokit transport и GitHub adapter | SAF-002 |
+| [SAF-003](./saf-003-status.md) | Stateless state derivation и `saf status` | SAF-002A |
 | [SAF-004](./saf-004-shape.md) | Issue превращается в approved plan | SAF-003 |
 | [SAF-005](./saf-005-build.md) | Approved plan превращается в Draft PR | SAF-004 |
 | [SAF-006](./saf-006-review.md) | Текущий PR SHA получает human acceptance | SAF-005 |

@@ -2,7 +2,7 @@
 
 ## Dependencies
 
-- SAF-002 завершён и принят.
+- SAF-002A завершён и принят.
 
 ## Goal
 
@@ -82,4 +82,3 @@ saf status 42 --json
 - Table-driven reducer tests.
 - Integration fixtures минимум для `Inbox`, `Ready`, `Review`, stale acceptance и drift.
 - Подтверждение отсутствия mutating GitHub calls.
-
