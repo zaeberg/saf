@@ -24,4 +24,16 @@ describe("OctokitTransport", () => {
     expect(paginate).toHaveBeenCalledWith(expect.stringContaining("items(first:100,after:$cursor)"), { owner: "zbrg", number: 5 });
     expect(paginate.mock.calls[0]?.[0]).not.toContain("mutation");
   });
+
+  it("uses explicit Octokit mutations for Project Status and Issue comments", async () => {
+    const graphql = Object.assign(vi.fn(async () => ({ updated: true })), { paginate: vi.fn() });
+    const createComment = vi.fn(async () => ({ data: { id: 11 } }));
+    const updateComment = vi.fn(async () => ({ data: { id: 11 } }));
+    const client = { rest: { issues: { createComment, updateComment } }, graphql, paginate: vi.fn() } as unknown as Pick<Octokit, "rest" | "graphql" | "paginate">;
+    const transport = new OctokitTransport(client);
+    await transport.updateProjectItemStatus("project", "item", "field", "option");
+    expect(graphql).toHaveBeenCalledWith(expect.stringContaining("updateProjectV2ItemFieldValue"), { projectId: "project", itemId: "item", fieldId: "field", optionId: "option" });
+    await expect(transport.createIssueComment("zbrg", "saf", 42, "body")).resolves.toEqual({ id: 11 });
+    await expect(transport.updateIssueComment("zbrg", "saf", 11, "changed")).resolves.toEqual({ id: 11 });
+  });
 });

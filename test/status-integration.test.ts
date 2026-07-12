@@ -25,12 +25,15 @@ const marker: ApprovedPlanMarker = { version: 1, kind: "approved-plan", issue: 4
 const config: SafConfigV1 = { version: 1, github: { repository: "zbrg/saf", project: { owner: "zbrg", number: 5 } }, repository: { defaultBranch: "master" }, documentation: { projectFile: "PROJECT.md", agentsFile: "AGENTS.md", plansDirectory: "docs/plans/active" }, planning: { adapter: "claude-glm" }, execution: { adapter: "ralphex-codex", maxConcurrentRuns: 1 }, review: { adapter: "revdiff" }, validation: { commands: ["pnpm check"] } };
 const adapter: GitHubAdapter = {
   getRepository: async () => success({ repository: "zbrg/saf", defaultBranch: "master" }),
-  getProject: async () => success({ id: "project", title: "SAF", statusOptions: [] }),
+  getProject: async () => success({ id: "project", title: "SAF", statusFieldId: "status", statusOptions: [] }),
   getIssue: async () => success({ number: 42, title: "Test", state: "open", body: "", comments: [{ id: 1, body: serializeMarker(marker), createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" }] }),
   getProjectItem: async () => success({ id: "item", status: "Ready" }),
   getPullRequest: async () => { throw new Error("unexpected PR read"); },
   getChecks: async () => { throw new Error("unexpected checks read"); },
-  getCommitStatus: async () => { throw new Error("unexpected status read"); }
+  getCommitStatus: async () => { throw new Error("unexpected status read"); },
+  setProjectItemStatus: async () => { throw new Error("unexpected mutation"); },
+  createIssueComment: async () => { throw new Error("unexpected mutation"); },
+  updateIssueComment: async () => { throw new Error("unexpected mutation"); }
 };
 
 function executor(root: string) {

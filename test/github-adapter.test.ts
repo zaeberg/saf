@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DefaultGitHubAdapter } from "../src/github/adapter.js";
 import type { GitHubTransport } from "../src/github/transport.js";
 import { requiredProjectStatuses } from "../src/github/types.js";
@@ -75,6 +75,17 @@ describe("GitHubAdapter", () => {
     await expect(adapter.getChecks("zbrg/saf", "a".repeat(40))).resolves.toMatchObject({ ok: true, data: { state: "pending", total: 2 } });
     await expect(adapter.getCommitStatus("zbrg/saf", "a".repeat(40), "saf/human-acceptance")).resolves.toMatchObject({ ok: true, data: { present: false } });
   });
+
+  it("updates Project Status and upserts Issue comments through typed mutations", async () => {
+    const updateProjectItemStatus = vi.fn(async () => ({}));
+    const createIssueComment = vi.fn(async () => ({ id: 11 }));
+    const updateIssueComment = vi.fn(async () => ({ id: 11 }));
+    const adapter = new DefaultGitHubAdapter({ ...transport(), updateProjectItemStatus, createIssueComment, updateIssueComment });
+    await expect(adapter.setProjectItemStatus({ owner: "zbrg", number: 5 }, "zbrg/saf", "item-1", "Shaping")).resolves.toMatchObject({ ok: true });
+    expect(updateProjectItemStatus).toHaveBeenCalledWith("PVT_1", "item-1", "status-field", "option-1");
+    await expect(adapter.createIssueComment("zbrg/saf", 42, "body")).resolves.toMatchObject({ ok: true, data: { id: 11 } });
+    await expect(adapter.updateIssueComment("zbrg/saf", 11, "changed")).resolves.toMatchObject({ ok: true, data: { id: 11 } });
+  });
 });
 
 function transport(overrides: { repository?: string; fields?: unknown[]; error?: Error; repositoryResponse?: unknown } = {}): GitHubTransport {
@@ -92,12 +103,15 @@ function transport(overrides: { repository?: string; fields?: unknown[]; error?:
     getProjectItem: async () => ({}),
     getPullRequest: async () => ({}),
     getChecks: async () => ({}),
-    getCommitStatuses: async () => []
+    getCommitStatuses: async () => [],
+    updateProjectItemStatus: async () => ({}),
+    createIssueComment: async () => ({ id: 1 }),
+    updateIssueComment: async () => ({ id: 1 })
   };
 }
 
 function projectResponse(overrides: { repository?: string; fields?: unknown[] } = {}): unknown {
-  const fields = overrides.fields ?? [{ name: "Status", options: requiredProjectStatuses.map((name, index) => ({ id: `option-${index}`, name })) }];
+  const fields = overrides.fields ?? [{ id: "status-field", name: "Status", options: requiredProjectStatuses.map((name, index) => ({ id: `option-${index}`, name })) }];
   return { owner: { projectV2: { id: "PVT_1", title: "SAF", fields: { nodes: fields }, items: { nodes: [
     { content: { repository: { nameWithOwner: "zbrg/saf" } } },
     { content: { repository: { nameWithOwner: overrides.repository ?? "zbrg/saf" } } }

@@ -33,12 +33,15 @@ describe("workflow fact reader", () => {
 function adapter(issueMarkerBodies: string[], prMarkerBodies: string[] = []): GitHubAdapter {
   return {
     getRepository: async () => success({ repository: "zbrg/saf", defaultBranch: "master" }),
-    getProject: async () => success({ id: "project", title: "SAF", statusOptions: [] }),
+    getProject: async () => success({ id: "project", title: "SAF", statusFieldId: "status", statusOptions: [] }),
     getIssue: async () => success({ number: 42, title: "Test", state: "open", body: "", comments: issueMarkerBodies.map((body, index) => ({ id: index + 1, body, createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" })) }),
     getProjectItem: async () => success({ id: "item", status: issueMarkerBodies.some((body) => body.includes('"kind": "run"')) ? "Review" : "Ready" }),
     getPullRequest: async () => success({ number: 51, state: "open", draft: true, merged: false, headSha: "a".repeat(40), branch: "feat/42", url: "url", comments: prMarkerBodies.map((body, index) => ({ id: index + 10, body, createdAt: "2026-07-12T00:00:00Z", updatedAt: "2026-07-12T00:00:00Z" })) }),
     getChecks: async () => success({ state: "success", total: 1, failing: [] }),
-    getCommitStatus: async (_repository, sha) => success({ present: false, sha })
+    getCommitStatus: async (_repository, sha) => success({ present: false, sha }),
+    setProjectItemStatus: async () => success(undefined),
+    createIssueComment: async () => success({ id: 1 }),
+    updateIssueComment: async () => success({ id: 1 })
   };
 }
 

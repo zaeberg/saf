@@ -62,4 +62,13 @@ describe("SAF markers", () => {
     expect(acceptanceBody).toContain(`- Commit: \`${acceptance.sha}\``);
     expect(parseMarkers([{ id: 1, body: runBody }, { id: 2, body: acceptanceBody }], 42)).toMatchObject({ run, acceptance, findings: [] });
   });
+
+  it.each([
+    ["line one\r\nline two   \r\n", "line one\nline two\n"],
+    ["line one\nline two\n\n\n", "line one\nline two\n"],
+    ["line one\rline two\t", "line one\nline two\n"]
+  ])("normalizes plan bytes deterministically", (input, expected) => {
+    expect(normalizePlan(input)).toBe(expected);
+    expect(hashPlan(input)).toBe(hashPlan(expected));
+  });
 });

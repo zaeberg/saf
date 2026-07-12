@@ -14,7 +14,7 @@ const projectSchema = z.object({
     projectV2: z.object({
       id: z.string(),
       title: z.string(),
-      fields: z.object({ nodes: z.array(z.object({ name: z.string().optional(), options: z.array(z.object({ id: z.string(), name: z.string() })).optional() }).passthrough()) }),
+      fields: z.object({ nodes: z.array(z.object({ id: z.string().optional(), name: z.string().optional(), options: z.array(z.object({ id: z.string(), name: z.string() })).optional() }).passthrough()) }),
       items: z.object({ nodes: z.array(z.object({ content: z.object({ repository: z.object({ nameWithOwner: z.string() }).optional() }).nullable().optional() }).passthrough()) })
     }).nullable()
   }).nullable()
@@ -61,11 +61,11 @@ export class DefaultGitHubAdapter implements GitHubAdapter {
       const foreign = [...repositories].filter((slug) => slug !== repository.toLowerCase());
       if (foreign.length > 0) return failure([{ code: "PROJECT_REPOSITORY_DRIFT", severity: "error", message: `Project contains items from other repositories: ${foreign.join(", ")}.`, remediation: "Use a repository-scoped Project containing only this repository." }]);
       const status = project.fields.nodes.find((field) => field.name === "Status");
-      if (!status?.options) return failure([{ code: "PROJECT_STATUS_FIELD_MISSING", severity: "error", message: "Project field Status is missing or is not a single-select field.", remediation: "Create a single-select Status field with all SAF MVP options." }]);
+      if (!status?.id || !status.options) return failure([{ code: "PROJECT_STATUS_FIELD_MISSING", severity: "error", message: "Project field Status is missing or is not a single-select field.", remediation: "Create a single-select Status field with all SAF MVP options." }]);
       const available = new Set(status.options.map((option) => option.name));
       const missing = requiredProjectStatuses.filter((name) => !available.has(name));
       if (missing.length > 0) return failure([{ code: "PROJECT_STATUS_OPTION_MISSING", severity: "error", message: `Status is missing options: ${missing.join(", ")}.`, remediation: "Add all required SAF MVP Status options." }]);
-      return success({ id: project.id, title: project.title, statusOptions: status.options });
+      return success({ id: project.id, title: project.title, statusFieldId: status.id, statusOptions: status.options });
     } catch (error: unknown) {
       return githubFailure(error, `Project ${reference.owner}/${reference.number}`);
     }
@@ -153,6 +153,41 @@ export class DefaultGitHubAdapter implements GitHubAdapter {
       return success({ present: latest?.state === "success", sha });
     } catch (error: unknown) {
       return githubFailure(error, `commit statuses for ${sha}`);
+    }
+  }
+
+  async setProjectItemStatus(reference: ProjectReference, repository: string, projectItemId: string, status: string): Promise<CommandResult<void>> {
+    const project = await this.getProject(reference, repository);
+    if (!project.ok) return project;
+    const option = project.data.statusOptions.find((candidate) => candidate.name === status);
+    if (!option) return failure([{ code: "PROJECT_STATUS_OPTION_MISSING", severity: "error", message: `Project Status option ${status} is missing.`, remediation: "Add all required SAF MVP Status options." }]);
+    try {
+      await this.#transport.updateProjectItemStatus(project.data.id, projectItemId, project.data.statusFieldId, option.id);
+      return success(undefined);
+    } catch (error: unknown) {
+      return githubFailure(error, `Project Status ${status}`);
+    }
+  }
+
+  async createIssueComment(repository: string, issue: number, body: string): Promise<CommandResult<{ id: number }>> {
+    const parts = splitRepository(repository);
+    if (!parts.ok) return parts;
+    try {
+      const parsed = z.object({ id: z.number() }).safeParse(await this.#transport.createIssueComment(parts.data.owner, parts.data.repository, issue, body));
+      return parsed.success ? success({ id: parsed.data.id }) : invalidResponse("Issue comment");
+    } catch (error: unknown) {
+      return githubFailure(error, `Issue #${issue} comment`);
+    }
+  }
+
+  async updateIssueComment(repository: string, commentId: number, body: string): Promise<CommandResult<{ id: number }>> {
+    const parts = splitRepository(repository);
+    if (!parts.ok) return parts;
+    try {
+      const parsed = z.object({ id: z.number() }).safeParse(await this.#transport.updateIssueComment(parts.data.owner, parts.data.repository, commentId, body));
+      return parsed.success ? success({ id: parsed.data.id }) : invalidResponse("Issue comment");
+    } catch (error: unknown) {
+      return githubFailure(error, `Issue comment ${commentId}`);
     }
   }
 }

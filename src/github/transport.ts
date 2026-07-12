@@ -9,6 +9,9 @@ export interface GitHubTransport {
   getPullRequest(owner: string, repository: string, pullRequest: number): Promise<unknown>;
   getChecks(owner: string, repository: string, sha: string): Promise<unknown>;
   getCommitStatuses(owner: string, repository: string, sha: string): Promise<unknown[]>;
+  updateProjectItemStatus(projectId: string, itemId: string, fieldId: string, optionId: string): Promise<unknown>;
+  createIssueComment(owner: string, repository: string, issue: number, body: string): Promise<unknown>;
+  updateIssueComment(owner: string, repository: string, commentId: number, body: string): Promise<unknown>;
 }
 
 const projectQuery = `query($owner:String!,$number:Int!,$cursor:String){
@@ -19,7 +22,7 @@ const projectQuery = `query($owner:String!,$number:Int!,$cursor:String){
 }
 fragment ProjectData on ProjectV2 {
   id title
-  fields(first:100){nodes{... on ProjectV2SingleSelectField{name options{id name}}}}
+  fields(first:100){nodes{... on ProjectV2SingleSelectField{id name options{id name}}}}
   items(first:100,after:$cursor){nodes{content{... on Issue{repository{nameWithOwner}} ... on PullRequest{repository{nameWithOwner}}}} pageInfo{hasNextPage endCursor}}
 }`;
 
@@ -33,6 +36,10 @@ fragment ProjectItemData on ProjectV2Item {
   id
   content{... on Issue{number repository{nameWithOwner}}}
   fieldValueByName(name:"Status"){... on ProjectV2ItemFieldSingleSelectValue{name}}
+}`;
+
+const updateProjectItemStatusMutation = `mutation($projectId:ID!,$itemId:ID!,$fieldId:ID!,$optionId:String!){
+  updateProjectV2ItemFieldValue(input:{projectId:$projectId,itemId:$itemId,fieldId:$fieldId,value:{singleSelectOptionId:$optionId}}){projectV2Item{id}}
 }`;
 
 export class OctokitTransport implements GitHubTransport {
@@ -77,6 +84,18 @@ export class OctokitTransport implements GitHubTransport {
 
   async getCommitStatuses(owner: string, repository: string, sha: string): Promise<unknown[]> {
     return this.#client.paginate(this.#client.rest.repos.listCommitStatusesForRef, { owner, repo: repository, ref: sha, per_page: 100 });
+  }
+
+  async updateProjectItemStatus(projectId: string, itemId: string, fieldId: string, optionId: string): Promise<unknown> {
+    return this.#client.graphql(updateProjectItemStatusMutation, { projectId, itemId, fieldId, optionId });
+  }
+
+  async createIssueComment(owner: string, repository: string, issue: number, body: string): Promise<unknown> {
+    return (await this.#client.rest.issues.createComment({ owner, repo: repository, issue_number: issue, body })).data;
+  }
+
+  async updateIssueComment(owner: string, repository: string, commentId: number, body: string): Promise<unknown> {
+    return (await this.#client.rest.issues.updateComment({ owner, repo: repository, comment_id: commentId, body })).data;
   }
 }
 

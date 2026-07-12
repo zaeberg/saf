@@ -12,6 +12,8 @@ export interface CommandInvocation {
   signal?: AbortSignal;
   onStdout?: (chunk: string) => void;
   onStderr?: (chunk: string) => void;
+  stdio?: "capture" | "inherit";
+  acceptedExitCodes?: number[];
 }
 
 export interface CommandExecution {
@@ -36,12 +38,13 @@ export async function runCommand(invocation: CommandInvocation): Promise<Command
   if (isAborted(signal)) return cancelled(safeCommand, safeArgs);
 
   try {
+    const inherited = invocation.stdio === "inherit";
     const options = {
       extendEnv: invocation.env === undefined,
       shell: false,
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
+      stdin: inherited ? "inherit" : "ignore",
+      stdout: inherited ? "inherit" : "pipe",
+      stderr: inherited ? "inherit" : "pipe",
       reject: false,
       stripFinalNewline: false,
       ...(invocation.cwd === undefined ? {} : { cwd: invocation.cwd }),
@@ -70,7 +73,7 @@ export async function runCommand(invocation: CommandInvocation): Promise<Command
       stderr: redact(typeof result.stderr === "string" ? result.stderr : "", secrets),
       dryRun: false
     };
-    if (execution.exitCode !== 0) {
+    if (!(invocation.acceptedExitCodes ?? [0]).includes(execution.exitCode)) {
       return failure([{ code: "COMMAND_FAILED", severity: "error", message: `Command ${safeCommand} exited with code ${execution.exitCode}.`, remediation: "Inspect the command output and retry." }]);
     }
     return success(execution);

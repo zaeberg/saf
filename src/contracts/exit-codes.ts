@@ -30,6 +30,12 @@ const exitCodeByDiagnostic: Record<DiagnosticCode, ExitCode> = {
   REBIND_REQUIRED: ExitCode.InvalidConfig,
   CONFIRMATION_REQUIRED: ExitCode.InvalidUsage,
   VALIDATION_COMMANDS_REQUIRED: ExitCode.InvalidUsage,
+  SHAPE_STATE_INVALID: ExitCode.InvalidUsage,
+  PLAN_NOT_FOUND: ExitCode.InvalidUsage,
+  PLAN_AMBIGUOUS: ExitCode.InvalidUsage,
+  PLAN_INVALID: ExitCode.InvalidUsage,
+  PLAN_REVIEW_REQUIRED: ExitCode.InvalidUsage,
+  PLAN_APPROVAL_REQUIRED: ExitCode.InvalidUsage,
   INVALID_ARGUMENT: ExitCode.InvalidUsage,
   INTERNAL_ERROR: ExitCode.InternalError
 };

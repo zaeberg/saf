@@ -7,6 +7,10 @@ import { renderResult } from "./output.js";
 import { runCommand } from "./runner/command-runner.js";
 import { renderHumanStatus } from "./status/report.js";
 import { getStatus } from "./status/status.js";
+import { shapeIssue } from "./shape/shape.js";
+import { revisePlan, runPlanner } from "./shape/planner.js";
+import { reviewPlan } from "./shape/review.js";
+import { writePlanningContext } from "./shape/context.js";
 
 export interface CliIo {
   stdout: (text: string) => void;
@@ -59,6 +63,20 @@ export async function runCli(argv: string[], io: CliIo): Promise<CliRunResult> {
       const globals = command.optsWithGlobals<{ json?: boolean }>();
       const result = await getStatus(Number(issueValue), io.cwd ?? process.cwd(), { execute: runCommand, github: createAuthenticatedGitHubAdapter });
       const rendered = globals.json === true ? renderResult(result, "json") : renderHumanStatus(result);
+      if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
+      commandExitCode = exitCodeFor(result.diagnostics);
+    });
+
+  program.command("shape")
+    .description("shape one GitHub Issue into an approved plan")
+    .argument("<issue>", "positive GitHub Issue number")
+    .option("--plan <path>", "import an existing plan instead of launching the planner")
+    .option("--yes", "explicitly approve the reviewed plan", false)
+    .action(async (issueValue: string, options: { plan?: string; yes: boolean }, command: Command) => {
+      const globals = command.optsWithGlobals<{ json?: boolean; dryRun?: boolean }>();
+      const confirm = io.confirm ?? (async () => false);
+      const result = await shapeIssue({ issue: Number(issueValue), ...(options.plan ? { planPath: options.plan } : {}), dryRun: globals.dryRun === true, yes: options.yes, interactive: io.interactive === true, cwd: io.cwd ?? process.cwd() }, { execute: runCommand, github: createAuthenticatedGitHubAdapter, prompt: { confirm }, planner: runPlanner, reviser: revisePlan, reviewer: reviewPlan, context: writePlanningContext });
+      const rendered = renderResult(result, globals.json === true ? "json" : "human");
       if (rendered.length > 0) (result.ok ? io.stdout : io.stderr)(`${rendered}\n`);
       commandExitCode = exitCodeFor(result.diagnostics);
     });

@@ -11,6 +11,7 @@ export interface RepositoryDetails {
 export interface ProjectDetails {
   id: string;
   title: string;
+  statusFieldId: string;
   statusOptions: Array<{ id: string; name: string }>;
 }
 
@@ -57,4 +58,7 @@ export interface GitHubAdapter {
   getPullRequest(repository: string, pullRequest: number): Promise<CommandResult<PullRequestDetails>>;
   getChecks(repository: string, sha: string): Promise<CommandResult<CheckDetails>>;
   getCommitStatus(repository: string, sha: string, context: string): Promise<CommandResult<CommitStatusDetails>>;
+  setProjectItemStatus(reference: ProjectReference, repository: string, projectItemId: string, status: string): Promise<CommandResult<void>>;
+  createIssueComment(repository: string, issue: number, body: string): Promise<CommandResult<{ id: number }>>;
+  updateIssueComment(repository: string, commentId: number, body: string): Promise<CommandResult<{ id: number }>>;
 }

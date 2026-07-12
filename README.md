@@ -40,3 +40,20 @@ saf status 42 --json
 ```
 
 The command is read-only and does not depend on `.saf/runtime/`. Project Status and evidence-derived state are displayed separately. Reducer precedence and marker contracts are documented in [docs/status-derivation.md](docs/status-derivation.md).
+
+## Issue shaping
+
+Start an interactive Claude Code + GLM brainstorm/planning session:
+
+```bash
+saf shape 42
+```
+
+Or import an existing plan for recovery:
+
+```bash
+saf shape 42 --plan docs/plans/active/issue-42.md
+saf shape 42 --plan docs/plans/active/issue-42.md --dry-run
+```
+
+SAF lints the plan, opens it in revdiff, requires explicit approval, publishes the shared human-readable `approved-plan` marker, and only then moves the Project item to `Ready`. Non-interactive approval requires the explicit `--yes` flag.

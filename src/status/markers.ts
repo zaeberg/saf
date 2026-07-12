@@ -43,8 +43,12 @@ export interface MarkerFinding {
 
 export interface ParsedMarkers {
   approvedPlan?: ApprovedPlanMarker;
+  approvedPlanCommentId?: number;
+  approvedPlanCommentIds?: number[];
   run?: RunMarker;
+  runCommentId?: number;
   acceptance?: AcceptanceMarker;
+  acceptanceCommentId?: number;
   findings: MarkerFinding[];
 }
 
@@ -72,15 +76,26 @@ export function parseMarkers(comments: Array<{ id: number; body: string; updated
     }
   }
 
-  const values = markers.map((entry) => entry.marker);
-  const approvedPlan = selectMarker(values.filter((marker): marker is ApprovedPlanMarker => marker.kind === "approved-plan"), "approved-plan", findings);
-  const run = selectMarker(values.filter((marker): marker is RunMarker => marker.kind === "run"), "run", findings);
-  const acceptance = markers
+  const approvedEntries = markers.filter((entry): entry is typeof entry & { marker: ApprovedPlanMarker } => entry.marker.kind === "approved-plan");
+  const runEntries = markers.filter((entry): entry is typeof entry & { marker: RunMarker } => entry.marker.kind === "run");
+  const approvedPlan = selectMarker(approvedEntries.map((entry) => entry.marker), "approved-plan", findings);
+  const run = selectMarker(runEntries.map((entry) => entry.marker), "run", findings);
+  const acceptanceEntry = markers
     .filter((entry): entry is typeof entry & { marker: AcceptanceMarker } => entry.marker.kind === "human-acceptance")
     .sort((left, right) => (left.updatedAt ?? "").localeCompare(right.updatedAt ?? "") || left.commentId - right.commentId)
-    .at(-1)?.marker;
+    .at(-1);
+  const acceptance = acceptanceEntry?.marker;
   if (approvedPlan && hashPlan(approvedPlan.plan) !== approvedPlan.sha256) findings.push({ code: "PLAN_HASH_MISMATCH", message: `Approved plan revision ${approvedPlan.revision} does not match its SHA-256.` });
-  return { ...(approvedPlan ? { approvedPlan } : {}), ...(run ? { run } : {}), ...(acceptance ? { acceptance } : {}), findings };
+  return {
+    ...(approvedPlan ? {
+      approvedPlan,
+      approvedPlanCommentId: approvedEntries.find((entry) => JSON.stringify(entry.marker) === JSON.stringify(approvedPlan))!.commentId,
+      approvedPlanCommentIds: approvedEntries.filter((entry) => JSON.stringify(entry.marker) === JSON.stringify(approvedPlan)).map((entry) => entry.commentId)
+    } : {}),
+    ...(run ? { run, runCommentId: runEntries.find((entry) => JSON.stringify(entry.marker) === JSON.stringify(run))!.commentId } : {}),
+    ...(acceptance && acceptanceEntry ? { acceptance, acceptanceCommentId: acceptanceEntry.commentId } : {}),
+    findings
+  };
 }
 
 export function normalizePlan(plan: string): string {

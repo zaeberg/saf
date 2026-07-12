@@ -11,7 +11,10 @@ const fakeAdapter: GitHubAdapter = {
   getProjectItem: async () => failure([]),
   getPullRequest: async () => failure([]),
   getChecks: async () => failure([]),
-  getCommitStatus: async () => failure([])
+  getCommitStatus: async () => failure([]),
+  setProjectItemStatus: async () => failure([]),
+  createIssueComment: async () => failure([]),
+  updateIssueComment: async () => failure([])
 };
 
 describe("GitHub credential boundary", () => {
